@@ -1,0 +1,263 @@
+import React, { useState } from "react";
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity,
+    TextInput, StatusBar, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import { useDatabase } from "@/src/context/DatabaseContext";
+import { router } from "expo-router";
+
+export default function AddBusScreen() {
+    const { addBus } = useDatabase();
+    const [busNumber, setBusNumber] = useState("");
+    const [driverName, setDriverName] = useState("");
+    const [driverPhone, setDriverPhone] = useState("");
+    const [capacity, setCapacity] = useState("40");
+    const [status, setStatus] = useState<"active" | "inactive">("active");
+    const [loading, setLoading] = useState(false);
+
+    const handleSave = async () => {
+        if (!busNumber.trim() || !driverName.trim()) {
+            Alert.alert("Missing Fields", "Bus number and driver name are required.");
+            return;
+        }
+        const cap = parseInt(capacity, 10);
+        if (isNaN(cap) || cap < 1) {
+            Alert.alert("Invalid Capacity", "Please enter a valid capacity.");
+            return;
+        }
+        setLoading(true);
+        try {
+            await addBus({
+                bus_number: busNumber.trim().toUpperCase(),
+                driver_name: driverName.trim(),
+                driver_phone: driverPhone.trim() || null,
+                capacity: cap,
+                status,
+            });
+            router.back();
+        } catch (e: any) {
+            Alert.alert("Error", e.message || "Failed to add bus.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" />
+            <LinearGradient colors={["#080812", "#0C0C1A"]} style={StyleSheet.absoluteFill} />
+
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+                {/* Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+                        <Ionicons name="arrow-back" size={20} color="#FFB800" />
+                    </TouchableOpacity>
+                    <View>
+                        <Text style={styles.headerLabel}>FLEET MANAGEMENT</Text>
+                        <Text style={styles.headerTitle}>Add New Bus</Text>
+                    </View>
+                </View>
+
+                <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+                    {/* Bus Icon */}
+                    <View style={styles.iconRow}>
+                        <LinearGradient colors={["#FFB800", "#FF8C00"]} style={styles.bigIcon}>
+                            <Ionicons name="bus" size={36} color="#fff" />
+                        </LinearGradient>
+                    </View>
+
+                    <View style={styles.card}>
+                        {/* Bus Number */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>BUS NUMBER *</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="id-card-outline" size={16} color="#555" style={styles.icon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g. KA01 AB 1234"
+                                    placeholderTextColor="#333"
+                                    value={busNumber}
+                                    onChangeText={setBusNumber}
+                                    autoCapitalize="characters"
+                                />
+                            </View>
+                        </View>
+
+                        {/* Driver Name */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>DRIVER NAME *</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="person-outline" size={16} color="#555" style={styles.icon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Full name"
+                                    placeholderTextColor="#333"
+                                    value={driverName}
+                                    onChangeText={setDriverName}
+                                />
+                            </View>
+                        </View>
+
+                        {/* Driver Phone */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>DRIVER PHONE</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="call-outline" size={16} color="#555" style={styles.icon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="+91 XXXXX XXXXX"
+                                    placeholderTextColor="#333"
+                                    value={driverPhone}
+                                    onChangeText={setDriverPhone}
+                                    keyboardType="phone-pad"
+                                />
+                            </View>
+                        </View>
+
+                        {/* Capacity */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>CAPACITY (STUDENTS)</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="people-outline" size={16} color="#555" style={styles.icon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="40"
+                                    placeholderTextColor="#333"
+                                    value={capacity}
+                                    onChangeText={setCapacity}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                        </View>
+
+                        {/* Status */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>STATUS</Text>
+                            <View style={styles.statusRow}>
+                                {(["active", "inactive"] as const).map(s => (
+                                    <TouchableOpacity
+                                        key={s}
+                                        style={[styles.statusOption, status === s && styles.statusOptionActive]}
+                                        onPress={() => setStatus(s)}
+                                    >
+                                        <View style={[styles.statusDot, {
+                                            backgroundColor: s === "active" ? "#00E676" : "#FF1744"
+                                        }]} />
+                                        <Text style={[styles.statusOptionText, status === s && styles.statusOptionTextActive]}>
+                                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+                    </View>
+
+                    {/* Save Button */}
+                    <TouchableOpacity onPress={handleSave} disabled={loading} activeOpacity={0.88}>
+                        <LinearGradient
+                            colors={loading ? ["#333", "#222"] : ["#FFB800", "#FF8C00"]}
+                            style={styles.saveBtn}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#0A0A0F" />
+                            ) : (
+                                <>
+                                    <Ionicons name="checkmark-circle" size={20} color="#0A0A0F" />
+                                    <Text style={styles.saveBtnText}>ADD BUS</Text>
+                                </>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    <View style={{ height: 40 }} />
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: "#080812" },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 16,
+        paddingHorizontal: 20,
+        paddingTop: 60,
+        paddingBottom: 20,
+    },
+    backBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,184,0,0.1)",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    headerLabel: { fontSize: 10, fontWeight: "800", color: "#FFB800", letterSpacing: 2, marginBottom: 2 },
+    headerTitle: { fontSize: 22, fontWeight: "900", color: "#FFFFFF" },
+
+    form: { paddingHorizontal: 20, paddingBottom: 40 },
+    iconRow: { alignItems: "center", marginBottom: 24 },
+    bigIcon: { width: 80, height: 80, borderRadius: 24, alignItems: "center", justifyContent: "center" },
+
+    card: {
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.07)",
+        marginBottom: 20,
+    },
+
+    field: { marginBottom: 18 },
+    label: { fontSize: 10, fontWeight: "800", color: "#555", letterSpacing: 1.5, marginBottom: 8 },
+    inputWrap: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        paddingHorizontal: 14,
+    },
+    icon: { marginRight: 10 },
+    input: { flex: 1, height: 48, color: "#FFFFFF", fontSize: 15 },
+
+    statusRow: { flexDirection: "row", gap: 12 },
+    statusOption: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+    },
+    statusOptionActive: {
+        backgroundColor: "rgba(255,184,0,0.15)",
+        borderColor: "rgba(255,184,0,0.4)",
+    },
+    statusDot: { width: 8, height: 8, borderRadius: 4 },
+    statusOptionText: { fontSize: 13, fontWeight: "700", color: "#666" },
+    statusOptionTextActive: { color: "#FFB800" },
+
+    saveBtn: {
+        height: 56,
+        borderRadius: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+    },
+    saveBtnText: { fontSize: 15, fontWeight: "900", color: "#0A0A0F", letterSpacing: 2 },
+});
