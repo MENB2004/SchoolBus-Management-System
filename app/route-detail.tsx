@@ -1,18 +1,20 @@
 import React, { useState, useCallback } from "react";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    StatusBar, Alert, RefreshControl,
+    StatusBar, Alert, RefreshControl, ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { router, useLocalSearchParams } from "expo-router";
 import { getFeeStatus, FEE_COLORS } from "@/src/data/mockData";
+import { buildRouteReportHTML, printAndSharePDF } from "@/src/utils/pdfReports";
 
 export default function RouteDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { routes, students, deleteRoute, refreshData } = useDatabase();
+    const { routes, students, payments, deleteRoute, refreshData } = useDatabase();
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
     const route = routes.find(r => r.id === id);
     const routeStudents = students.filter(s => s.route_id === id);
@@ -44,6 +46,20 @@ export default function RouteDetailScreen() {
             ]
         );
     };
+
+    const handleExportPDF = useCallback(async () => {
+        if (!route) return;
+        setIsExporting(true);
+        try {
+            const routeStudents = students.filter(s => s.route_id === id);
+            const html = buildRouteReportHTML(route, routeStudents, payments);
+            await printAndSharePDF(html, `Route_Report_${route.route_name.replace(/\s+/g, "_")}`);
+        } catch (e: any) {
+            Alert.alert("Export Error", e.message);
+        } finally {
+            setIsExporting(false);
+        }
+    }, [route, students, payments, id]);
 
     if (!route) {
         return (
@@ -211,6 +227,18 @@ export default function RouteDetailScreen() {
                     )}
                 </View>
 
+                {/* Export PDF */}
+                <TouchableOpacity onPress={handleExportPDF} disabled={isExporting} activeOpacity={0.88} style={{ marginBottom: 12 }}>
+                    <LinearGradient colors={isExporting ? ["#333", "#222"] : ["#FFB800", "#FF8C00"]} style={styles.exportBtn}>
+                        {isExporting ? <ActivityIndicator color="#0A0A0F" /> : (
+                            <>
+                                <Ionicons name="document-text-outline" size={18} color="#0A0A0F" />
+                                <Text style={styles.exportBtnText}>EXPORT ROUTE REPORT</Text>
+                            </>
+                        )}
+                    </LinearGradient>
+                </TouchableOpacity>
+
                 {/* Delete */}
                 <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.8}>
                     <Ionicons name="trash-outline" size={18} color="#FF1744" />
@@ -267,6 +295,8 @@ const styles = StyleSheet.create({
     feeText: { fontSize: 10, fontWeight: "700" },
 
     emptyText: { fontSize: 13, color: "#444", fontWeight: "600", paddingVertical: 12 },
+    exportBtn: { height: 52, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+    exportBtnText: { fontSize: 14, fontWeight: "900", color: "#0A0A0F", letterSpacing: 1.5 },
     deleteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 16, borderRadius: 16, backgroundColor: "rgba(255,23,68,0.1)", borderWidth: 1, borderColor: "rgba(255,23,68,0.2)", marginTop: 10 },
     deleteBtnText: { fontSize: 14, fontWeight: "700", color: "#FF1744" },
 });

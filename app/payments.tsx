@@ -1,18 +1,32 @@
 import React, { useState, useMemo, useCallback } from "react";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    StatusBar, RefreshControl, ActivityIndicator,
+    StatusBar, RefreshControl, ActivityIndicator, Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { router } from "expo-router";
 import { getFeeStatus, FEE_COLORS } from "@/src/data/mockData";
+import { buildMonthlyPaymentReportHTML, printAndSharePDF } from "@/src/utils/pdfReports";
 
 export default function PaymentsScreen() {
-    const { students, payments, refreshData, isLoading } = useDatabase();
+    const { students, payments, routes, refreshData, isLoading } = useDatabase();
     const [filter, setFilter] = useState<"all" | "paid" | "due" | "overdue">("all");
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+
+    // Generate last 6 months as selectable labels
+    const monthOptions = useMemo(() => {
+        const months: string[] = [];
+        const now = new Date();
+        for (let i = 0; i < 6; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            months.push(d.toLocaleDateString("en-IN", { month: "long", year: "numeric" }));
+        }
+        return months;
+    }, []);
+    const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]);
 
     const stats = useMemo(() => {
         let paid = 0, due = 0, overdue = 0, collected = 0, total = 0;
@@ -38,6 +52,23 @@ export default function PaymentsScreen() {
         setIsRefreshing(false);
     }, [refreshData]);
 
+    // Filter payments for the selected month
+    const monthPayments = useMemo(() => {
+        return payments.filter(p => p.month === selectedMonth);
+    }, [payments, selectedMonth]);
+
+    const handleExportPDF = useCallback(async () => {
+        setIsExporting(true);
+        try {
+            const html = buildMonthlyPaymentReportHTML(selectedMonth, monthPayments, students, routes);
+            await printAndSharePDF(html, `Payment_Report_${selectedMonth.replace(/\s+/g, "_")}`);
+        } catch (e: any) {
+            Alert.alert("Export Error", e.message);
+        } finally {
+            setIsExporting(false);
+        }
+    }, [selectedMonth, monthPayments, students, routes]);
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
@@ -53,10 +84,25 @@ export default function PaymentsScreen() {
                     <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
                         <Ionicons name="arrow-back" size={20} color="#7C3AED" />
                     </TouchableOpacity>
-                    <View>
+                    <View style={{ flex: 1 }}>
                         <Text style={styles.headerLabel}>PAYMENT MANAGEMENT</Text>
                         <Text style={styles.headerTitle}>Fee Collection</Text>
                     </View>
+                    <TouchableOpacity
+                        onPress={handleExportPDF}
+                        disabled={isExporting}
+                        activeOpacity={0.8}
+                    >
+                        <LinearGradient
+                            colors={isExporting ? ["#333", "#222"] : ["#FFB800", "#FF8C00"]}
+                            style={styles.exportHeaderBtn}
+                        >
+                            {isExporting
+                                ? <ActivityIndicator size="small" color="#0A0A0F" />
+                                : <Ionicons name="download-outline" size={18} color="#0A0A0F" />
+                            }
+                        </LinearGradient>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Summary Cards */}
@@ -96,6 +142,34 @@ export default function PaymentsScreen() {
                         </View>
                     </View>
                 </LinearGradient>
+
+                {/* Month Selector */}
+                <Text style={styles.sectionTitle}>SELECT MONTH</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.monthScroll} contentContainerStyle={{ paddingRight: 20 }}>
+                    {monthOptions.map(m => (
+                        <TouchableOpacity
+                            key={m}
+                            style={[styles.monthChip, selectedMonth === m && styles.monthChipActive]}
+                            onPress={() => setSelectedMonth(m)}
+                        >
+                            <Text style={[styles.monthChipText, selectedMonth === m && styles.monthChipTextActive]}>
+                                {m}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                {/* Export Row */}
+                <TouchableOpacity onPress={handleExportPDF} disabled={isExporting} activeOpacity={0.88}>
+                    <LinearGradient colors={isExporting ? ["#333", "#222"] : ["#FFB800", "#FF8C00"]} style={styles.exportBtn}>
+                        {isExporting ? <ActivityIndicator color="#0A0A0F" /> : (
+                            <>
+                                <Ionicons name="document-text-outline" size={18} color="#0A0A0F" />
+                                <Text style={styles.exportBtnText}>EXPORT {selectedMonth.toUpperCase()} REPORT</Text>
+                            </>
+                        )}
+                    </LinearGradient>
+                </TouchableOpacity>
 
                 {/* Recent Payments */}
                 {payments.length > 0 && (
@@ -186,6 +260,7 @@ const styles = StyleSheet.create({
 
     header: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 24 },
     backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(124,58,237,0.15)", alignItems: "center", justifyContent: "center" },
+    exportHeaderBtn: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
     headerLabel: { fontSize: 10, fontWeight: "800", color: "#7C3AED", letterSpacing: 2, marginBottom: 2 },
     headerTitle: { fontSize: 22, fontWeight: "900", color: "#FFFFFF" },
 
@@ -229,4 +304,12 @@ const styles = StyleSheet.create({
     feeText: { fontSize: 15, fontWeight: "900" },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 3 },
     statusText: { fontSize: 10, fontWeight: "700" },
+
+    monthScroll: { marginBottom: 16, marginHorizontal: -20, paddingLeft: 20 },
+    monthChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", marginRight: 8 },
+    monthChipActive: { backgroundColor: "rgba(124,58,237,0.2)", borderColor: "rgba(124,58,237,0.5)" },
+    monthChipText: { fontSize: 12, fontWeight: "700", color: "#666" },
+    monthChipTextActive: { color: "#7C3AED" },
+    exportBtn: { height: 52, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 20 },
+    exportBtnText: { fontSize: 13, fontWeight: "900", color: "#0A0A0F", letterSpacing: 1 },
 });
