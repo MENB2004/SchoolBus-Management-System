@@ -47,7 +47,8 @@
       "reactCompiler": true
     },
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/d66216b2-2fd0-4ae8-89e6-f99f59815965"
     },
     "runtimeVersion": {
       "policy": "appVersion"
