@@ -1,60 +1,25 @@
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Re-export Types from Supabase ────────────────────────────────────────────
+// All types are now defined in supabase.ts for single source of truth.
+// We re-export them here so existing imports from mockData still work.
+export type {
+    Tenant,
+    UserRole,
+    Driver,
+    Bus,
+    Route,
+    Student,
+    ParentStudent,
+    Payment,
+    Attendance,
+    AuditLog,
+    AppRole,
+} from "@/src/lib/supabase";
+
+import type { Bus, Route, Student, Payment, Driver } from "@/src/lib/supabase";
+
+// ─── Fee Status Types ─────────────────────────────────────────────────────────
 
 export type FeeStatus = "paid" | "due" | "overdue";
-
-export type Bus = {
-    id: string;
-    bus_number: string;
-    driver_name: string;
-    driver_phone: string | null;
-    capacity: number;
-    status: "active" | "inactive";
-    created_at: string;
-};
-
-export type Route = {
-    id: string;
-    route_name: string;
-    bus_id: string | null;
-    start_point: string;
-    end_point: string;
-    stops: string[];
-    stop_fees?: number[];
-    monthly_fee: number;
-    created_at: string;
-    bus?: Bus;
-};
-
-export type Student = {
-    id: string;
-    name: string;
-    class: string;
-    section: string | null;
-    parent_name: string;
-    parent_phone: string | null;
-    route_id: string | null;
-    bus_id: string | null;
-    boarding_stop: string | null;
-    monthly_fee: number;
-    fee_paid_until: string | null;
-    avatar_url: string | null;
-    is_active: boolean;
-    created_at: string;
-    route?: Route;
-    bus?: Bus;
-    days_remaining?: number;
-};
-
-export type Payment = {
-    id: string;
-    student_id: string;
-    amount: number;
-    paid_at: string;
-    month: string;
-    payment_mode: string;
-    notes: string | null;
-    student?: Student;
-};
 
 // ─── Fee Utilities ────────────────────────────────────────────────────────────
 
@@ -122,41 +87,80 @@ export function getRouteById(routes: Route[], id: string): Route | undefined {
     return routes.find((r) => String(r.id) === id);
 }
 
+/** Get driver by ID from a list */
+export function getDriverById(drivers: Driver[], id: string): Driver | undefined {
+    return drivers.find((d) => String(d.id) === id);
+}
+
+// ─── Mock Tenant ID ──────────────────────────────────────────────────────────
+export const MOCK_TENANT_ID = "11111111-0000-0000-0000-000000000001";
+
 // ─── Mock Datasets for Sandbox Fallback ────────────────────────────────────────
+
+export const MOCK_DRIVERS: Driver[] = [
+    {
+        id: "driver-1",
+        tenant_id: MOCK_TENANT_ID,
+        user_id: null,
+        name: "Ramesh Kumar",
+        phone: "9876543210",
+        created_at: new Date().toISOString(),
+    },
+    {
+        id: "driver-2",
+        tenant_id: MOCK_TENANT_ID,
+        user_id: null,
+        name: "Suresh Singh",
+        phone: "9876543211",
+        created_at: new Date().toISOString(),
+    },
+    {
+        id: "driver-3",
+        tenant_id: MOCK_TENANT_ID,
+        user_id: null,
+        name: "Mahesh Yadav",
+        phone: "9876543212",
+        created_at: new Date().toISOString(),
+    },
+];
 
 export const MOCK_BUSES: Bus[] = [
     {
         id: "bus-1",
+        tenant_id: MOCK_TENANT_ID,
         bus_number: "KA-01-F-1234",
-        driver_name: "Ramesh Kumar",
-        driver_phone: "9876543210",
+        driver_id: "driver-1",
         capacity: 40,
         status: "active",
         created_at: new Date().toISOString(),
+        driver: MOCK_DRIVERS[0],
     },
     {
         id: "bus-2",
+        tenant_id: MOCK_TENANT_ID,
         bus_number: "KA-01-F-5678",
-        driver_name: "Suresh Singh",
-        driver_phone: "9876543211",
+        driver_id: "driver-2",
         capacity: 30,
         status: "active",
         created_at: new Date().toISOString(),
+        driver: MOCK_DRIVERS[1],
     },
     {
         id: "bus-3",
+        tenant_id: MOCK_TENANT_ID,
         bus_number: "KA-01-F-9012",
-        driver_name: "Mahesh Yadav",
-        driver_phone: "9876543212",
+        driver_id: "driver-3",
         capacity: 50,
         status: "inactive",
         created_at: new Date().toISOString(),
+        driver: MOCK_DRIVERS[2],
     },
 ];
 
 export const MOCK_ROUTES: Route[] = [
     {
         id: "route-1",
+        tenant_id: MOCK_TENANT_ID,
         route_name: "Route A (HSR Layout)",
         bus_id: "bus-1",
         start_point: "School Campus",
@@ -168,6 +172,7 @@ export const MOCK_ROUTES: Route[] = [
     },
     {
         id: "route-2",
+        tenant_id: MOCK_TENANT_ID,
         route_name: "Route B (Koramangala)",
         bus_id: "bus-2",
         start_point: "School Campus",
@@ -182,49 +187,43 @@ export const MOCK_ROUTES: Route[] = [
 export const MOCK_STUDENTS: Student[] = [
     {
         id: "student-1",
+        tenant_id: MOCK_TENANT_ID,
         name: "Aarav Sharma",
         class: "5th",
         section: "A",
-        parent_name: "Rajesh Sharma",
-        parent_phone: "9988776655",
         route_id: "route-1",
         bus_id: "bus-1",
         boarding_stop: "Sector 3",
         monthly_fee: 2500,
-        fee_paid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
-        avatar_url: null,
+        fee_paid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         is_active: true,
         created_at: new Date().toISOString(),
     },
     {
         id: "student-2",
+        tenant_id: MOCK_TENANT_ID,
         name: "Ananya Iyer",
         class: "8th",
         section: "B",
-        parent_name: "Subramanian Iyer",
-        parent_phone: "9988776656",
         route_id: "route-1",
         bus_id: "bus-1",
         boarding_stop: "Sector 7",
         monthly_fee: 2500,
-        fee_paid_until: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 4 days from now (due soon)
-        avatar_url: null,
+        fee_paid_until: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         is_active: true,
         created_at: new Date().toISOString(),
     },
     {
         id: "student-3",
+        tenant_id: MOCK_TENANT_ID,
         name: "Vihaan Patel",
         class: "10th",
         section: "C",
-        parent_name: "Amit Patel",
-        parent_phone: "9988776657",
         route_id: "route-2",
         bus_id: "bus-2",
         boarding_stop: "Sony Signal",
         monthly_fee: 3000,
-        fee_paid_until: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 10 days ago (overdue)
-        avatar_url: null,
+        fee_paid_until: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         is_active: true,
         created_at: new Date().toISOString(),
     },
@@ -233,20 +232,24 @@ export const MOCK_STUDENTS: Student[] = [
 export const MOCK_PAYMENTS: Payment[] = [
     {
         id: "pay-1",
+        tenant_id: MOCK_TENANT_ID,
         student_id: "student-1",
         amount: 2500,
         paid_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
         month: "May 2026",
         payment_mode: "UPI",
         notes: "Fee paid successfully via GPay",
+        created_at: new Date().toISOString(),
     },
     {
         id: "pay-2",
+        tenant_id: MOCK_TENANT_ID,
         student_id: "student-2",
         amount: 2500,
         paid_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
         month: "April 2026",
         payment_mode: "Cash",
         notes: "Handed over to class teacher",
+        created_at: new Date().toISOString(),
     },
 ];

@@ -10,11 +10,12 @@ export default function DriverDashboard() {
     const { user, signOut } = useAuth();
     const { buses, routes, students } = useDatabase();
 
-    // Filter to this driver's bus
-    let myBus = buses.find(b => b.driver_name.toLowerCase() === user?.name?.toLowerCase());
+    // Find this driver's bus via the drivers table
+    // In production, the driver user's auth.uid would be linked via a user_id field on the drivers table
+    // For now, match by driver name or use mock fallback
+    let myBus = buses.find(b => b.driver?.name?.toLowerCase() === user?.name?.toLowerCase());
 
-    // Sandbox fallback: If no exact match (e.g. user metadata name is empty/defaulted to "driver")
-    // and they are logged in as the mock driver, auto-assign to the first active bus for testing!
+    // Sandbox fallback
     if (!myBus && (user?.email === "driver@school.com" || user?.name?.toLowerCase() === "driver")) {
         myBus = buses.find(b => b.status === "active");
     }
@@ -49,6 +50,22 @@ export default function DriverDashboard() {
                                 <Text style={styles.busStats}>{myStudents.length} students assigned</Text>
                             </View>
                         </View>
+
+                        {/* Mark Attendance Button */}
+                        <TouchableOpacity 
+                            onPress={() => router.push("/(driver)/attendance")} 
+                            activeOpacity={0.88}
+                            style={{ marginBottom: 24 }}
+                        >
+                            <LinearGradient 
+                                colors={["#FFB800", "#FF8C00"]} 
+                                style={styles.markBtn}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            >
+                                <Ionicons name="calendar-outline" size={18} color="#0A0A0F" />
+                                <Text style={styles.markBtnText}>MARK TODAY'S ATTENDANCE</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
 
                         <Text style={styles.sectionTitle}>MY STUDENTS ({myStudents.length})</Text>
                         {myStudents.map(s => (
@@ -98,4 +115,13 @@ const styles = StyleSheet.create({
     empty: { alignItems: "center", paddingTop: 80, gap: 12 },
     emptyTitle: { fontSize: 20, fontWeight: "800", color: "#333" },
     emptySub: { fontSize: 13, color: "#444", textAlign: "center" },
+    markBtn: {
+        height: 52,
+        borderRadius: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+    },
+    markBtnText: { fontSize: 13, fontWeight: "900", color: "#0A0A0F", letterSpacing: 1 },
 });

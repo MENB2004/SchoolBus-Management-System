@@ -9,7 +9,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import { supabase } from "@/src/lib/supabase";
 import { LinearGradient } from "expo-linear-gradient";
 
-export default function DriverLayout() {
+export default function ParentLayout() {
     const { user, signOut } = useAuth();
     const router = useRouter();
     const segments = useSegments();
@@ -142,12 +142,11 @@ export default function DriverLayout() {
 
     const navigateTo = (path: string) => {
         closeSidebar();
-        router.replace(`/(driver)/${path}`);
+        router.replace(`/(parent)/${path}`);
     };
 
     const sidebarItems = [
-        { id: "dashboard", label: "Dashboard", icon: "grid" },
-        { id: "attendance", label: "Mark Attendance", icon: "calendar" },
+        { id: "dashboard", label: "My Children", icon: "people" },
     ];
 
     return (
@@ -167,16 +166,16 @@ export default function DriverLayout() {
                 
                 <View style={styles.sidebarHeader}>
                     <View style={styles.logoRing}>
-                        <Ionicons name="bus" size={24} color="#FFB800" />
+                        <Ionicons name="home" size={24} color="#FFB800" />
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.schoolLabel} numberOfLines={1}>{schoolName.toUpperCase()}</Text>
-                        <Text style={styles.roleLabel}>DRIVER CONSOLE</Text>
+                        <Text style={styles.roleLabel}>PARENT PORTAL</Text>
                     </View>
                 </View>
 
                 <ScrollView contentContainerStyle={styles.sidebarScroll} showsVerticalScrollIndicator={false}>
-                    <Text style={styles.sectionTitle}>FLEET ACTIONS</Text>
+                    <Text style={styles.sectionTitle}>PORTAL NAVIGATION</Text>
                     {sidebarItems.map(item => {
                         const isActive = currentRoute === item.id;
                         return (
@@ -206,7 +205,7 @@ export default function DriverLayout() {
                         <Ionicons name="log-out-outline" size={20} color="#FF1744" />
                         <Text style={styles.logoutText}>SIGN OUT</Text>
                     </TouchableOpacity>
-                    <Text style={styles.versionTag}>Fleet Manager v1.0</Text>
+                    <Text style={versionTagStyle}>Fleet Manager v1.0</Text>
                 </View>
             </Animated.View>
 
@@ -238,6 +237,8 @@ export default function DriverLayout() {
         </View>
     );
 }
+
+const versionTagStyle = { textAlign: "center" as const, fontSize: 10, color: "#222", marginTop: 12, fontWeight: "600" as const };
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#080812" },
@@ -325,7 +326,6 @@ const styles = StyleSheet.create({
         borderColor: "rgba(255,23,68,0.15)"
     },
     logoutText: { fontSize: 12, fontWeight: "900", color: "#FF1744", letterSpacing: 1 },
-    versionTag: { textAlign: "center", fontSize: 10, color: "#222", marginTop: 12, fontWeight: "600" },
 
     floatingSymbol: {
         position: "absolute",

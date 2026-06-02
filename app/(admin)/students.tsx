@@ -84,8 +84,7 @@ export default function StudentsScreen() {
             const q = search.toLowerCase();
             list = list.filter(s =>
                 s.name.toLowerCase().includes(q) ||
-                s.class.toLowerCase().includes(q) ||
-                s.parent_name.toLowerCase().includes(q)
+                s.class.toLowerCase().includes(q)
             );
         }
         if (filterStatus !== "all") {

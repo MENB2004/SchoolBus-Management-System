@@ -16,8 +16,6 @@ export default function EditStudentScreen() {
     const [name, setName] = useState(student?.name ?? "");
     const [studentClass, setStudentClass] = useState(student?.class ?? "");
     const [section, setSection] = useState(student?.section ?? "");
-    const [parentName, setParentName] = useState(student?.parent_name ?? "");
-    const [parentPhone, setParentPhone] = useState(student?.parent_phone ?? "");
     const [selectedRouteId, setSelectedRouteId] = useState<string | null>(student?.route_id ?? null);
     const [boardingStop, setBoardingStop] = useState(student?.boarding_stop ?? "");
     const [monthlyFee, setMonthlyFee] = useState(String(student?.monthly_fee ?? ""));
@@ -27,8 +25,8 @@ export default function EditStudentScreen() {
     const selectedRoute = routes.find(r => r.id === selectedRouteId);
 
     const handleSave = async () => {
-        if (!name.trim() || !studentClass.trim() || !parentName.trim()) {
-            Alert.alert("Missing Fields", "Student name, class, and parent name are required.");
+        if (!name.trim() || !studentClass.trim()) {
+            Alert.alert("Missing Fields", "Student name and class are required.");
             return;
         }
         const fee = parseFloat(monthlyFee);
@@ -37,7 +35,6 @@ export default function EditStudentScreen() {
         try {
             await updateStudent(id!, {
                 name: name.trim(), class: studentClass.trim(), section: section.trim() || null,
-                parent_name: parentName.trim(), parent_phone: parentPhone.trim() || null,
                 route_id: selectedRouteId, bus_id: selectedRoute?.bus_id ?? null,
                 boarding_stop: boardingStop.trim() || null, monthly_fee: fee, is_active: isActive,
             });
@@ -71,14 +68,12 @@ export default function EditStudentScreen() {
                             { label: "STUDENT NAME *", value: name, set: setName, placeholder: "Full name", icon: "person-outline" as const },
                             { label: "CLASS *", value: studentClass, set: setStudentClass, placeholder: "Grade 5", icon: "school-outline" as const },
                             { label: "SECTION", value: section, set: setSection, placeholder: "A", icon: "albums-outline" as const, autoCapitalize: "characters" as const },
-                            { label: "PARENT NAME *", value: parentName, set: setParentName, placeholder: "Parent full name", icon: "people-outline" as const },
-                            { label: "PARENT PHONE", value: parentPhone, set: setParentPhone, placeholder: "+91 XXXXX XXXXX", icon: "call-outline" as const, keyboardType: "phone-pad" as const },
                         ].map((f, i) => (
                             <View key={i} style={styles.field}>
                                 <Text style={styles.label}>{f.label}</Text>
                                 <View style={styles.inputWrap}>
                                     <Ionicons name={f.icon} size={16} color="#555" style={styles.icon} />
-                                    <TextInput style={styles.input} placeholder={f.placeholder} placeholderTextColor="#333" value={f.value} onChangeText={f.set} autoCapitalize={f.autoCapitalize} keyboardType={f.keyboardType} />
+                                    <TextInput style={styles.input} placeholder={f.placeholder} placeholderTextColor="#333" value={f.value} onChangeText={f.set} autoCapitalize={f.autoCapitalize} />
                                 </View>
                             </View>
                         ))}

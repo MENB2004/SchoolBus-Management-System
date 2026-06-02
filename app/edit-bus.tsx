@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, StatusBar, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
@@ -10,19 +10,18 @@ import { router, useLocalSearchParams } from "expo-router";
 
 export default function EditBusScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { buses, updateBus } = useDatabase();
+    const { buses, drivers, updateBus } = useDatabase();
     const bus = buses.find(b => b.id === id);
 
     const [busNumber, setBusNumber] = useState(bus?.bus_number ?? "");
-    const [driverName, setDriverName] = useState(bus?.driver_name ?? "");
-    const [driverPhone, setDriverPhone] = useState(bus?.driver_phone ?? "");
+    const [selectedDriverId, setSelectedDriverId] = useState<string | null>(bus?.driver_id ?? null);
     const [capacity, setCapacity] = useState(String(bus?.capacity ?? 40));
     const [status, setStatus] = useState<"active" | "inactive">(bus?.status as any ?? "active");
     const [loading, setLoading] = useState(false);
 
     const handleSave = async () => {
-        if (!busNumber.trim() || !driverName.trim()) {
-            Alert.alert("Missing Fields", "Bus number and driver name are required.");
+        if (!busNumber.trim()) {
+            Alert.alert("Missing Fields", "Bus number is required.");
             return;
         }
         const cap = parseInt(capacity, 10);
@@ -31,8 +30,7 @@ export default function EditBusScreen() {
         try {
             await updateBus(id!, {
                 bus_number: busNumber.trim().toUpperCase(),
-                driver_name: driverName.trim(),
-                driver_phone: driverPhone.trim() || null,
+                driver_id: selectedDriverId,
                 capacity: cap,
                 status,
             });
@@ -62,28 +60,65 @@ export default function EditBusScreen() {
                 </View>
                 <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
                     <View style={styles.card}>
-                        {[
-                            { label: "BUS NUMBER *", value: busNumber, set: setBusNumber, placeholder: "KA01 AB 1234", icon: "id-card-outline" as const, autoCapitalize: "characters" as const },
-                            { label: "DRIVER NAME *", value: driverName, set: setDriverName, placeholder: "Full name", icon: "person-outline" as const },
-                            { label: "DRIVER PHONE", value: driverPhone, set: setDriverPhone, placeholder: "+91 XXXXX XXXXX", icon: "call-outline" as const, keyboardType: "phone-pad" as const },
-                            { label: "CAPACITY", value: capacity, set: setCapacity, placeholder: "40", icon: "people-outline" as const, keyboardType: "numeric" as const },
-                        ].map((f, i) => (
-                            <View key={i} style={styles.field}>
-                                <Text style={styles.label}>{f.label}</Text>
-                                <View style={styles.inputWrap}>
-                                    <Ionicons name={f.icon} size={16} color="#555" style={styles.icon} />
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder={f.placeholder}
-                                        placeholderTextColor="#333"
-                                        value={f.value}
-                                        onChangeText={f.set}
-                                        autoCapitalize={f.autoCapitalize}
-                                        keyboardType={f.keyboardType}
-                                    />
-                                </View>
+                        {/* Bus Number */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>BUS NUMBER *</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="id-card-outline" size={16} color="#555" style={styles.icon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="KA01 AB 1234"
+                                    placeholderTextColor="#333"
+                                    value={busNumber}
+                                    onChangeText={setBusNumber}
+                                    autoCapitalize="characters"
+                                />
                             </View>
-                        ))}
+                        </View>
+
+                        {/* Driver Selection */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>ASSIGN DRIVER</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
+                                <TouchableOpacity
+                                    style={[styles.driverChip, selectedDriverId === null && styles.driverChipActive]}
+                                    onPress={() => setSelectedDriverId(null)}
+                                >
+                                    <Ionicons name="close-circle-outline" size={14} color={selectedDriverId === null ? "#FFB800" : "#555"} />
+                                    <Text style={[styles.driverChipText, selectedDriverId === null && styles.driverChipTextActive]}>None</Text>
+                                </TouchableOpacity>
+                                {drivers.map(d => (
+                                    <TouchableOpacity
+                                        key={d.id}
+                                        style={[styles.driverChip, selectedDriverId === d.id && styles.driverChipActive]}
+                                        onPress={() => setSelectedDriverId(d.id)}
+                                    >
+                                        <Ionicons name="person" size={14} color={selectedDriverId === d.id ? "#FFB800" : "#555"} />
+                                        <Text style={[styles.driverChipText, selectedDriverId === d.id && styles.driverChipTextActive]}>
+                                            {d.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+
+                        {/* Capacity */}
+                        <View style={styles.field}>
+                            <Text style={styles.label}>CAPACITY</Text>
+                            <View style={styles.inputWrap}>
+                                <Ionicons name="people-outline" size={16} color="#555" style={styles.icon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="40"
+                                    placeholderTextColor="#333"
+                                    value={capacity}
+                                    onChangeText={setCapacity}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                        </View>
+
+                        {/* Status */}
                         <View style={styles.field}>
                             <Text style={styles.label}>STATUS</Text>
                             <View style={styles.statusRow}>
@@ -121,6 +156,14 @@ const styles = StyleSheet.create({
     inputWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", paddingHorizontal: 14 },
     icon: { marginRight: 10 },
     input: { flex: 1, height: 48, color: "#FFFFFF", fontSize: 15 },
+    driverChip: {
+        flexDirection: "row", alignItems: "center", gap: 6,
+        paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)", marginHorizontal: 4,
+    },
+    driverChipActive: { backgroundColor: "rgba(255,184,0,0.15)", borderColor: "rgba(255,184,0,0.4)" },
+    driverChipText: { fontSize: 13, fontWeight: "700", color: "#666" },
+    driverChipTextActive: { color: "#FFB800" },
     statusRow: { flexDirection: "row", gap: 12 },
     statusOption: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
     statusOptionActive: { backgroundColor: "rgba(255,184,0,0.15)", borderColor: "rgba(255,184,0,0.4)" },

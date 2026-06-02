@@ -222,8 +222,6 @@ export function buildRouteReportHTML(
                 <td style="font-weight:700">${s.name}</td>
                 <td>${s.class}${s.section ? " – " + s.section : ""}</td>
                 <td>${s.boarding_stop ?? "—"}</td>
-                <td>${s.parent_name}</td>
-                <td>${s.parent_phone ?? "—"}</td>
                 <td style="font-weight:700">${formatCurrency(s.monthly_fee)}</td>
                 <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
             </tr>`;
@@ -244,7 +242,7 @@ export function buildRouteReportHTML(
             </div>
             <div class="meta-item">
                 <div class="label">Driver</div>
-                <div class="value">${route.bus?.driver_name ?? "—"}</div>
+                <div class="value">${route.bus?.driver?.name ?? "—"}</div>
             </div>
             <div class="meta-item">
                 <div class="label">Route</div>
@@ -290,14 +288,12 @@ export function buildRouteReportHTML(
                     <th>Name</th>
                     <th>Class</th>
                     <th>Boarding Stop</th>
-                    <th>Parent</th>
-                    <th>Phone</th>
                     <th>Fee</th>
                     <th>Status</th>
                 </tr>
             </thead>
             <tbody>
-                ${studentRows || '<tr><td colspan="7" style="text-align:center;color:#999;padding:20px">No students enrolled on this route.</td></tr>'}
+                ${studentRows || '<tr><td colspan="5" style="text-align:center;color:#999;padding:20px">No students enrolled on this route.</td></tr>'}
             </tbody>
         </table>
 

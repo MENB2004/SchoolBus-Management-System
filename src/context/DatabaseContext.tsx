@@ -7,39 +7,52 @@ import React, {
     ReactNode,
 } from "react";
 import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
+import type { Bus, Route, Student, Payment, Driver, Attendance } from "@/src/lib/supabase";
 import { 
-    Bus, Route, Student, Payment, getDaysRemaining,
-    MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS 
+    getDaysRemaining,
+    MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS, MOCK_DRIVERS, MOCK_TENANT_ID
 } from "@/src/data/mockData";
+import { useAuth } from "@/src/context/AuthContext";
 
 type DatabaseContextType = {
     buses: Bus[];
     routes: Route[];
     students: Student[];
     payments: Payment[];
+    drivers: Driver[];
     isLoading: boolean;
     error: string | null;
     refreshData: () => Promise<void>;
     fetchRevenueStats: () => Promise<{ month: string; revenue: number }[]>;
 
     // Bus operations
-    addBus: (bus: Omit<Bus, "id" | "created_at">) => Promise<void>;
+    addBus: (bus: Omit<Bus, "id" | "created_at" | "driver" | "tenant_id">) => Promise<void>;
     updateBus: (id: string, updates: Partial<Bus>) => Promise<void>;
     deleteBus: (id: string) => Promise<void>;
 
     // Route operations
-    addRoute: (route: Omit<Route, "id" | "created_at" | "bus">) => Promise<void>;
+    addRoute: (route: Omit<Route, "id" | "created_at" | "tenant_id">) => Promise<void>;
     updateRoute: (id: string, updates: Partial<Route>) => Promise<void>;
     deleteRoute: (id: string) => Promise<void>;
 
     // Student operations
-    addStudent: (student: Omit<Student, "id" | "created_at" | "route" | "bus" | "days_remaining">) => Promise<void>;
+    addStudent: (student: Omit<Student, "id" | "created_at" | "route" | "bus" | "days_remaining" | "tenant_id">) => Promise<void>;
     updateStudent: (id: string, updates: Partial<Student>) => Promise<void>;
     deleteStudent: (id: string) => Promise<void>;
 
     // Payment operations
-    recordPayment: (payment: Omit<Payment, "id" | "student">) => Promise<void>;
+    recordPayment: (payment: Omit<Payment, "id" | "student" | "created_at" | "tenant_id">) => Promise<void>;
     getStudentPayments: (studentId: string) => Promise<Payment[]>;
+
+    // Driver operations
+    addDriver: (driver: Omit<Driver, "id" | "created_at" | "tenant_id">) => Promise<void>;
+    updateDriver: (id: string, updates: Partial<Driver>) => Promise<void>;
+    deleteDriver: (id: string) => Promise<void>;
+
+    // Attendance operations
+    markAttendance: (attendance: Omit<Attendance, "id" | "recorded_at" | "student" | "tenant_id">) => Promise<void>;
+    getAttendanceByDate: (date: string) => Promise<Attendance[]>;
+    getStudentAttendance: (studentId: string) => Promise<Attendance[]>;
 };
 
 const DatabaseContext = createContext<DatabaseContextType>({} as DatabaseContextType);
@@ -47,6 +60,9 @@ const DatabaseContext = createContext<DatabaseContextType>({} as DatabaseContext
 export const useDatabase = () => useContext(DatabaseContext);
 
 export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
+    const { user } = useAuth();
+    const tenantId = user?.tenant_id || MOCK_TENANT_ID;
+
     const [buses, setBuses] = useState<Bus[]>(isSupabaseConfigured ? [] : MOCK_BUSES);
     const [routes, setRoutes] = useState<Route[]>(isSupabaseConfigured ? [] : MOCK_ROUTES.map(r => ({
         ...r,
@@ -59,28 +75,40 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         days_remaining: getDaysRemaining(s.fee_paid_until)
     })));
     const [payments, setPayments] = useState<Payment[]>(isSupabaseConfigured ? [] : MOCK_PAYMENTS);
+    const [drivers, setDrivers] = useState<Driver[]>(isSupabaseConfigured ? [] : MOCK_DRIVERS);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const loadBuses = async (): Promise<Bus[]> => {
+    // ─── Data Loading (RLS handles tenant filtering on Supabase side) ─────────
+
+    const loadDrivers = async (): Promise<Driver[]> => {
+        const { data, error } = await supabase
+            .from("drivers")
+            .select("*")
+            .order("name", { ascending: true });
+        if (error) throw error;
+        return (data ?? []) as Driver[];
+    };
+
+    const loadBuses = async (driverList: Driver[]): Promise<Bus[]> => {
         const { data, error } = await supabase
             .from("buses")
             .select("*")
             .order("bus_number", { ascending: true });
         if (error) throw error;
-        return (data ?? []) as Bus[];
+        return ((data ?? []) as Bus[]).map((b) => ({
+            ...b,
+            driver: driverList.find((d) => d.id === b.driver_id),
+        }));
     };
 
-    const loadRoutes = async (busList: Bus[]): Promise<Route[]> => {
+    const loadRoutes = async (): Promise<Route[]> => {
         const { data, error } = await supabase
             .from("routes")
             .select("*")
             .order("route_name", { ascending: true });
         if (error) throw error;
-        return ((data ?? []) as Route[]).map((r) => ({
-            ...r,
-            bus: busList.find((b) => b.id === r.bus_id),
-        }));
+        return (data ?? []) as Route[];
     };
 
     const loadStudents = async (busList: Bus[], routeList: Route[]): Promise<Student[]> => {
@@ -115,13 +143,20 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(true);
         setError(null);
         try {
-            const busList = await loadBuses();
+            const driverList = await loadDrivers();
+            setDrivers(driverList);
+
+            const busList = await loadBuses(driverList);
             setBuses(busList);
 
-            const routeList = await loadRoutes(busList);
-            setRoutes(routeList);
+            const routeList = await loadRoutes();
+            const routeListWithBus = routeList.map(r => ({
+                ...r,
+                bus: busList.find(b => b.id === r.bus_id)
+            }));
+            setRoutes(routeListWithBus);
 
-            const studentList = await loadStudents(busList, routeList);
+            const studentList = await loadStudents(busList, routeListWithBus);
             setStudents(studentList);
 
             const paymentList = await loadPayments();
@@ -166,31 +201,79 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         return entries.map(([month, revenue]) => ({ month, revenue }));
     }, [payments]);
 
+    // ─── Driver Operations ────────────────────────────────────────────────────
+
+    const addDriver = async (driver: Omit<Driver, "id" | "created_at" | "tenant_id">) => {
+        if (!isSupabaseConfigured) {
+            const newDriver: Driver = {
+                ...driver,
+                id: `driver-${Date.now()}`,
+                tenant_id: tenantId,
+                created_at: new Date().toISOString(),
+            };
+            setDrivers(prev => [...prev, newDriver]);
+            return;
+        }
+        const { error } = await supabase.from("drivers").insert([{ ...driver, tenant_id: tenantId }]);
+        if (error) throw new Error(error.message);
+        await refreshData();
+    };
+
+    const updateDriver = async (id: string, updates: Partial<Driver>) => {
+        if (!isSupabaseConfigured) {
+            setDrivers(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+            // Update driver info on buses that reference this driver
+            setBuses(prev => prev.map(b => b.driver_id === id ? { ...b, driver: { ...b.driver!, ...updates } } : b));
+            return;
+        }
+        const { tenant_id: _, ...safeUpdates } = updates as any;
+        const { error } = await supabase.from("drivers").update(safeUpdates).eq("id", id);
+        if (error) throw new Error(error.message);
+        await refreshData();
+    };
+
+    const deleteDriver = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setDrivers(prev => prev.filter(d => d.id !== id));
+            setBuses(prev => prev.map(b => b.driver_id === id ? { ...b, driver_id: null, driver: undefined } : b));
+            return;
+        }
+        const { error } = await supabase.from("drivers").delete().eq("id", id);
+        if (error) throw new Error(error.message);
+        await refreshData();
+    };
+
     // ─── Bus Operations ───────────────────────────────────────────────────────
 
-    const addBus = async (bus: Omit<Bus, "id" | "created_at">) => {
+    const addBus = async (bus: Omit<Bus, "id" | "created_at" | "driver" | "tenant_id">) => {
         if (!isSupabaseConfigured) {
             const newBus: Bus = {
                 ...bus,
                 id: `bus-${Date.now()}`,
-                created_at: new Date().toISOString()
-            } as Bus;
+                tenant_id: tenantId,
+                created_at: new Date().toISOString(),
+                driver: drivers.find(d => d.id === bus.driver_id),
+            };
             setBuses(prev => [...prev, newBus]);
             return;
         }
-        const { error } = await supabase.from("buses").insert([bus]);
+        const { error } = await supabase.from("buses").insert([{ ...bus, tenant_id: tenantId }]);
         if (error) throw new Error(error.message);
         await refreshData();
     };
 
     const updateBus = async (id: string, updates: Partial<Bus>) => {
         if (!isSupabaseConfigured) {
-            setBuses(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
-            setRoutes(prev => prev.map(r => r.bus_id === id ? { ...r, bus: { ...r.bus, ...updates } as Bus } : r));
-            setStudents(prev => prev.map(s => s.bus_id === id ? { ...s, bus: { ...s.bus, ...updates } as Bus } : s));
+            const { driver: _, ...safeUpdates } = updates as any;
+            setBuses(prev => prev.map(b => b.id === id ? {
+                ...b,
+                ...safeUpdates,
+                driver: drivers.find(d => d.id === (safeUpdates.driver_id !== undefined ? safeUpdates.driver_id : b.driver_id)),
+            } : b));
             return;
         }
-        const { error } = await supabase.from("buses").update(updates).eq("id", id);
+        const { driver: _, tenant_id: __, ...safeUpdates } = updates as any;
+        const { error } = await supabase.from("buses").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
     };
@@ -198,7 +281,6 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     const deleteBus = async (id: string) => {
         if (!isSupabaseConfigured) {
             setBuses(prev => prev.filter(b => b.id !== id));
-            setRoutes(prev => prev.map(r => r.bus_id === id ? { ...r, bus_id: null, bus: undefined } : r));
             setStudents(prev => prev.map(s => s.bus_id === id ? { ...s, bus_id: null, bus: undefined } : s));
             return;
         }
@@ -209,37 +291,32 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     // ─── Route Operations ─────────────────────────────────────────────────────
 
-    const addRoute = async (route: Omit<Route, "id" | "created_at" | "bus">) => {
+    const addRoute = async (route: Omit<Route, "id" | "created_at" | "tenant_id">) => {
         if (!isSupabaseConfigured) {
             const newRoute: Route = {
                 ...route,
                 id: `route-${Date.now()}`,
+                tenant_id: tenantId,
                 created_at: new Date().toISOString(),
-                bus: buses.find(b => b.id === route.bus_id)
-            } as Route;
+            };
             setRoutes(prev => [...prev, newRoute]);
             return;
         }
-        const { error } = await supabase.from("routes").insert([route]);
+        const { error } = await supabase.from("routes").insert([{ ...route, tenant_id: tenantId }]);
         if (error) throw new Error(error.message);
         await refreshData();
     };
 
     const updateRoute = async (id: string, updates: Partial<Route>) => {
         if (!isSupabaseConfigured) {
-            const { bus: _, ...safeUpdates } = updates as any;
-            setRoutes(prev => prev.map(r => r.id === id ? { 
-                ...r, 
-                ...safeUpdates, 
-                bus: buses.find(b => b.id === (safeUpdates.bus_id !== undefined ? safeUpdates.bus_id : r.bus_id))
-            } : r));
+            setRoutes(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
             setStudents(prev => prev.map(s => s.route_id === id ? { 
                 ...s, 
-                route: { ...s.route, ...safeUpdates } as Route 
+                route: { ...s.route, ...updates } as Route 
             } : s));
             return;
         }
-        const { bus: _, ...safeUpdates } = updates as any;
+        const { tenant_id: _, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("routes").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
@@ -258,20 +335,21 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     // ─── Student Operations ───────────────────────────────────────────────────
 
-    const addStudent = async (student: Omit<Student, "id" | "created_at" | "route" | "bus" | "days_remaining">) => {
+    const addStudent = async (student: Omit<Student, "id" | "created_at" | "route" | "bus" | "days_remaining" | "tenant_id">) => {
         if (!isSupabaseConfigured) {
             const newStudent: Student = {
                 ...student,
                 id: `student-${Date.now()}`,
+                tenant_id: tenantId,
                 created_at: new Date().toISOString(),
                 bus: buses.find(b => b.id === student.bus_id),
                 route: routes.find(r => r.id === student.route_id),
                 days_remaining: getDaysRemaining(student.fee_paid_until)
-            } as Student;
+            };
             setStudents(prev => [...prev, newStudent]);
             return;
         }
-        const { error } = await supabase.from("students").insert([student]);
+        const { error } = await supabase.from("students").insert([{ ...student, tenant_id: tenantId }]);
         if (error) throw new Error(error.message);
         await refreshData();
     };
@@ -291,7 +369,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             }));
             return;
         }
-        const { bus: _, route: __, days_remaining: ___, ...safeUpdates } = updates as any;
+        const { bus: _, route: __, days_remaining: ___, tenant_id: ____, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("students").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
@@ -309,13 +387,15 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     // ─── Payment Operations ───────────────────────────────────────────────────
 
-    const recordPayment = async (payment: Omit<Payment, "id" | "student">) => {
+    const recordPayment = async (payment: Omit<Payment, "id" | "student" | "created_at" | "tenant_id">) => {
         if (!isSupabaseConfigured) {
             const newPayment: Payment = {
                 ...payment,
                 id: `pay-${Date.now()}`,
-                student: students.find(s => s.id === payment.student_id)
-            } as Payment;
+                tenant_id: tenantId,
+                student: students.find(s => s.id === payment.student_id),
+                created_at: new Date().toISOString(),
+            };
             setPayments(prev => [newPayment, ...prev]);
 
             const studentId = payment.student_id;
@@ -331,7 +411,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             } : s));
             return;
         }
-        const { error } = await supabase.from("payments").insert([payment]);
+        const { error } = await supabase.from("payments").insert([{ ...payment, tenant_id: tenantId }]);
         if (error) throw new Error(error.message);
         await refreshData();
     };
@@ -349,12 +429,51 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         return (data ?? []) as Payment[];
     };
 
+    // ─── Attendance Operations ────────────────────────────────────────────────
+
+    const markAttendance = async (attendance: Omit<Attendance, "id" | "recorded_at" | "student" | "tenant_id">) => {
+        if (!isSupabaseConfigured) {
+            // Mock: just log it
+            console.log("Mock attendance marked:", attendance);
+            return;
+        }
+        const { error } = await supabase.from("attendance").insert([{ ...attendance, tenant_id: tenantId }]);
+        if (error) throw new Error(error.message);
+    };
+
+    const getAttendanceByDate = async (date: string): Promise<Attendance[]> => {
+        if (!isSupabaseConfigured) return [];
+        const { data, error } = await supabase
+            .from("attendance")
+            .select("*")
+            .eq("date", date)
+            .order("recorded_at", { ascending: false });
+        if (error) throw new Error(error.message);
+        return ((data ?? []) as Attendance[]).map(a => ({
+            ...a,
+            student: students.find(s => s.id === a.student_id),
+        }));
+    };
+
+    const getStudentAttendance = async (studentId: string): Promise<Attendance[]> => {
+        if (!isSupabaseConfigured) return [];
+        const { data, error } = await supabase
+            .from("attendance")
+            .select("*")
+            .eq("student_id", studentId)
+            .order("date", { ascending: false })
+            .limit(30);
+        if (error) throw new Error(error.message);
+        return (data ?? []) as Attendance[];
+    };
+
     return (
         <DatabaseContext.Provider value={{
             buses,
             routes,
             students,
             payments,
+            drivers,
             isLoading,
             error,
             refreshData,
@@ -370,6 +489,12 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             deleteStudent,
             recordPayment,
             getStudentPayments,
+            addDriver,
+            updateDriver,
+            deleteDriver,
+            markAttendance,
+            getAttendanceByDate,
+            getStudentAttendance,
         }}>
             {children}
         </DatabaseContext.Provider>

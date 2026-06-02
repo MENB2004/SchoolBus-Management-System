@@ -261,12 +261,6 @@ export default function StudentDetailScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>STUDENT INFORMATION</Text>
                     <View style={styles.infoCard}>
-                        <InfoRow icon="people" label="Parent / Guardian" value={student.parent_name} accent="#FFB800" />
-                        {student.parent_phone && (
-                            <TouchableOpacity onPress={() => Linking.openURL(`tel:${student.parent_phone}`)}>
-                                <InfoRow icon="call" label="Parent Phone" value={student.parent_phone} accent="#00E676" isLink />
-                            </TouchableOpacity>
-                        )}
                         {student.route && (
                             <InfoRow icon="map" label="Route" value={student.route.route_name} accent="#2E5A9F" />
                         )}

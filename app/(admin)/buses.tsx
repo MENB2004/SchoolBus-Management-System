@@ -31,7 +31,7 @@ function BusCard({ bus, routeCount, studentCount }: { bus: Bus; routeCount: numb
                 </LinearGradient>
                 <View style={{ flex: 1, marginLeft: 14 }}>
                     <Text style={styles.busNumber}>{bus.bus_number}</Text>
-                    <Text style={styles.driverName}>{bus.driver_name}</Text>
+                    <Text style={styles.driverName}>{bus.driver?.name ?? "No driver"}</Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: isActive ? "rgba(0,230,118,0.15)" : "rgba(255,23,68,0.15)" }]}>
                     <View style={[styles.statusDot, { backgroundColor: isActive ? "#00E676" : "#FF1744" }]} />
@@ -56,10 +56,10 @@ function BusCard({ bus, routeCount, studentCount }: { bus: Bus; routeCount: numb
                 </View>
             </View>
 
-            {bus.driver_phone && (
+            {bus.driver?.phone && (
                 <View style={styles.phoneRow}>
                     <Ionicons name="call-outline" size={12} color="#555" />
-                    <Text style={styles.phoneText}>{bus.driver_phone}</Text>
+                    <Text style={styles.phoneText}>{bus.driver.phone}</Text>
                 </View>
             )}
 
@@ -80,7 +80,7 @@ export default function BusesScreen() {
             const q = search.toLowerCase();
             list = list.filter(b =>
                 b.bus_number.toLowerCase().includes(q) ||
-                b.driver_name.toLowerCase().includes(q)
+                b.driver?.name?.toLowerCase().includes(q)
             );
         }
         if (filterStatus !== "all") {

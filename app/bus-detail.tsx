@@ -48,8 +48,8 @@ export default function BusDetailScreen() {
     };
 
     const callDriver = () => {
-        if (bus?.driver_phone) {
-            Linking.openURL(`tel:${bus.driver_phone}`);
+        if (bus?.driver?.phone) {
+            Linking.openURL(`tel:${bus.driver.phone}`);
         }
     };
 
@@ -136,17 +136,17 @@ export default function BusDetailScreen() {
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.infoLabel}>Driver Name</Text>
-                                <Text style={styles.infoValue}>{bus.driver_name}</Text>
+                                <Text style={styles.infoValue}>{bus.driver?.name ?? "Not Assigned"}</Text>
                             </View>
                         </View>
-                        {bus.driver_phone && (
+                        {bus.driver?.phone && (
                             <TouchableOpacity style={styles.infoRow} onPress={callDriver} activeOpacity={0.7}>
                                 <View style={[styles.infoIcon, { backgroundColor: "rgba(0,230,118,0.15)" }]}>
                                     <Ionicons name="call" size={16} color="#00E676" />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <Text style={styles.infoLabel}>Phone</Text>
-                                    <Text style={[styles.infoValue, { color: "#00E676" }]}>{bus.driver_phone}</Text>
+                                    <Text style={[styles.infoValue, { color: "#00E676" }]}>{bus.driver.phone}</Text>
                                 </View>
                                 <Ionicons name="call-outline" size={18} color="#00E676" />
                             </TouchableOpacity>

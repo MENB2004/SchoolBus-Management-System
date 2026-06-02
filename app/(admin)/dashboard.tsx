@@ -320,6 +320,18 @@ export default function AdminDashboard() {
                             accent="#E91E63"
                         />
                         <ActionGridItem
+                            icon="people"
+                            title="Drivers"
+                            onPress={() => router.push("/(admin)/drivers")}
+                            accent="#FF8C00"
+                        />
+                        <ActionGridItem
+                            icon="calendar"
+                            title="Attendance"
+                            onPress={() => router.push("/(admin)/attendance")}
+                            accent="#00E676"
+                        />
+                        <ActionGridItem
                             icon="settings"
                             title="Settings"
                             onPress={() => router.push("/(admin)/settings")}

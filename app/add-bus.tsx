@@ -9,17 +9,16 @@ import { useDatabase } from "@/src/context/DatabaseContext";
 import { router } from "expo-router";
 
 export default function AddBusScreen() {
-    const { addBus } = useDatabase();
+    const { addBus, drivers } = useDatabase();
     const [busNumber, setBusNumber] = useState("");
-    const [driverName, setDriverName] = useState("");
-    const [driverPhone, setDriverPhone] = useState("");
+    const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
     const [capacity, setCapacity] = useState("40");
     const [status, setStatus] = useState<"active" | "inactive">("active");
     const [loading, setLoading] = useState(false);
 
     const handleSave = async () => {
-        if (!busNumber.trim() || !driverName.trim()) {
-            Alert.alert("Missing Fields", "Bus number and driver name are required.");
+        if (!busNumber.trim()) {
+            Alert.alert("Missing Fields", "Bus number is required.");
             return;
         }
         const cap = parseInt(capacity, 10);
@@ -31,8 +30,7 @@ export default function AddBusScreen() {
         try {
             await addBus({
                 bus_number: busNumber.trim().toUpperCase(),
-                driver_name: driverName.trim(),
-                driver_phone: driverPhone.trim() || null,
+                driver_id: selectedDriverId,
                 capacity: cap,
                 status,
             });
@@ -87,35 +85,33 @@ export default function AddBusScreen() {
                             </View>
                         </View>
 
-                        {/* Driver Name */}
+                        {/* Driver Selection */}
                         <View style={styles.field}>
-                            <Text style={styles.label}>DRIVER NAME *</Text>
-                            <View style={styles.inputWrap}>
-                                <Ionicons name="person-outline" size={16} color="#555" style={styles.icon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Full name"
-                                    placeholderTextColor="#333"
-                                    value={driverName}
-                                    onChangeText={setDriverName}
-                                />
-                            </View>
-                        </View>
-
-                        {/* Driver Phone */}
-                        <View style={styles.field}>
-                            <Text style={styles.label}>DRIVER PHONE</Text>
-                            <View style={styles.inputWrap}>
-                                <Ionicons name="call-outline" size={16} color="#555" style={styles.icon} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="+91 XXXXX XXXXX"
-                                    placeholderTextColor="#333"
-                                    value={driverPhone}
-                                    onChangeText={setDriverPhone}
-                                    keyboardType="phone-pad"
-                                />
-                            </View>
+                            <Text style={styles.label}>ASSIGN DRIVER</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -4 }}>
+                                <TouchableOpacity
+                                    style={[styles.driverChip, selectedDriverId === null && styles.driverChipActive]}
+                                    onPress={() => setSelectedDriverId(null)}
+                                >
+                                    <Ionicons name="close-circle-outline" size={14} color={selectedDriverId === null ? "#FFB800" : "#555"} />
+                                    <Text style={[styles.driverChipText, selectedDriverId === null && styles.driverChipTextActive]}>None</Text>
+                                </TouchableOpacity>
+                                {drivers.map(d => (
+                                    <TouchableOpacity
+                                        key={d.id}
+                                        style={[styles.driverChip, selectedDriverId === d.id && styles.driverChipActive]}
+                                        onPress={() => setSelectedDriverId(d.id)}
+                                    >
+                                        <Ionicons name="person" size={14} color={selectedDriverId === d.id ? "#FFB800" : "#555"} />
+                                        <Text style={[styles.driverChipText, selectedDriverId === d.id && styles.driverChipTextActive]}>
+                                            {d.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                            {drivers.length === 0 && (
+                                <Text style={styles.hintText}>No drivers yet. Add drivers in the Drivers tab first.</Text>
+                            )}
                         </View>
 
                         {/* Capacity */}
@@ -229,6 +225,26 @@ const styles = StyleSheet.create({
     },
     icon: { marginRight: 10 },
     input: { flex: 1, height: 48, color: "#FFFFFF", fontSize: 15 },
+
+    driverChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        marginHorizontal: 4,
+    },
+    driverChipActive: {
+        backgroundColor: "rgba(255,184,0,0.15)",
+        borderColor: "rgba(255,184,0,0.4)",
+    },
+    driverChipText: { fontSize: 13, fontWeight: "700", color: "#666" },
+    driverChipTextActive: { color: "#FFB800" },
+    hintText: { fontSize: 11, color: "#444", marginTop: 6, fontStyle: "italic" },
 
     statusRow: { flexDirection: "row", gap: 12 },
     statusOption: {

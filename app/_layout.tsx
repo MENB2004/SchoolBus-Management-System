@@ -22,6 +22,7 @@ if (Platform.OS === "web") {
 function dashboardForRole(role: UserType["role"]) {
     if (role === "admin") return "/(admin)/dashboard";
     if (role === "driver") return "/(driver)/dashboard";
+    if (role === "parent") return "/(parent)/dashboard";
     return "/(admin)/dashboard";
 }
 
@@ -38,10 +39,12 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         const screen = routeSegments[1];
         const isAuthRoute = group === "(auth)";
         const isLoginRoute = isAuthRoute && screen === "login";
+        const isRegisterRoute = isAuthRoute && screen === "register-school";
+        const isPublicRoute = isLoginRoute || isRegisterRoute;
 
         // Not logged in — redirect to login
         if (!user) {
-            if (!isLoginRoute) {
+            if (!isPublicRoute) {
                 router.replace("/(auth)/login");
             }
             return;
@@ -56,8 +59,8 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Logged in on login screen — redirect to dashboard
-        if (isLoginRoute) {
+        // Logged in on a public route — redirect to dashboard
+        if (isPublicRoute) {
             router.replace(dashboardForRole(user.role));
             return;
         }
@@ -69,6 +72,11 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
         }
 
         if (group === "(driver)" && user.role !== "driver") {
+            router.replace(dashboardForRole(user.role));
+            return;
+        }
+
+        if (group === "(parent)" && user.role !== "parent") {
             router.replace(dashboardForRole(user.role));
             return;
         }

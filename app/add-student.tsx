@@ -15,8 +15,6 @@ export default function AddStudentScreen() {
     const [name, setName] = useState("");
     const [studentClass, setStudentClass] = useState("");
     const [section, setSection] = useState("");
-    const [parentName, setParentName] = useState("");
-    const [parentPhone, setParentPhone] = useState("");
     const [selectedRouteId, setSelectedRouteId] = useState<string | null>(routeId ?? null);
     const [boardingStop, setBoardingStop] = useState("");
     const [monthlyFee, setMonthlyFee] = useState("");
@@ -39,8 +37,8 @@ export default function AddStudentScreen() {
     }, [selectedRoute, boardingStop]);
 
     const handleSave = async () => {
-        if (!name.trim() || !studentClass.trim() || !parentName.trim()) {
-            Alert.alert("Missing Fields", "Student name, class, and parent name are required.");
+        if (!name.trim() || !studentClass.trim()) {
+            Alert.alert("Missing Fields", "Student name and class are required.");
             return;
         }
         const fee = parseFloat(monthlyFee);
@@ -54,14 +52,11 @@ export default function AddStudentScreen() {
                 name: name.trim(),
                 class: studentClass.trim(),
                 section: section.trim() || null,
-                parent_name: parentName.trim(),
-                parent_phone: parentPhone.trim() || null,
                 route_id: selectedRouteId,
                 bus_id: selectedBusId,
                 boarding_stop: boardingStop.trim() || null,
                 monthly_fee: fee,
                 fee_paid_until: null,
-                avatar_url: null,
                 is_active: true,
             });
             router.back();
@@ -122,22 +117,6 @@ export default function AddStudentScreen() {
                             </View>
                         </View>
 
-                        {/* Parent */}
-                        <View style={styles.field}>
-                            <Text style={styles.label}>PARENT / GUARDIAN NAME *</Text>
-                            <View style={styles.inputWrap}>
-                                <Ionicons name="people-outline" size={16} color="#555" style={styles.icon} />
-                                <TextInput style={styles.input} placeholder="Parent full name" placeholderTextColor="#333" value={parentName} onChangeText={setParentName} />
-                            </View>
-                        </View>
-
-                        <View style={styles.field}>
-                            <Text style={styles.label}>PARENT PHONE</Text>
-                            <View style={styles.inputWrap}>
-                                <Ionicons name="call-outline" size={16} color="#555" style={styles.icon} />
-                                <TextInput style={styles.input} placeholder="+91 XXXXX XXXXX" placeholderTextColor="#333" value={parentPhone} onChangeText={setParentPhone} keyboardType="phone-pad" />
-                            </View>
-                        </View>
 
                         {/* Route */}
                         <View style={styles.field}>

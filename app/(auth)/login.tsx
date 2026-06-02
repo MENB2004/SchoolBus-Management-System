@@ -243,6 +243,16 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                         </Animated.View>
 
+                        {/* Register School Link */}
+                        <TouchableOpacity 
+                            style={{ alignSelf: "center", marginTop: 20 }}
+                            onPress={() => router.push("/(auth)/register-school")}
+                        >
+                            <Text style={{ color: "#FFB800", fontWeight: "800", fontSize: 13, letterSpacing: 0.5 }}>
+                                REGISTER A NEW SCHOOL
+                            </Text>
+                        </TouchableOpacity>
+
                         {/* Bottom tag */}
                         <Text style={styles.bottomTag}>
                             Bus Management System v1.0
