@@ -3,6 +3,7 @@ import React, {
     useState,
     useEffect,
     useContext,
+    useRef,
     ReactNode,
 } from "react";
 import { supabase, AppRole } from "@/src/lib/supabase";
@@ -69,6 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<UserType | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const skipNextAuthEvent = useRef(false);
 
     useEffect(() => {
         supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -82,6 +84,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
+                // Skip if updatePassword already handled this event
+                if (skipNextAuthEvent.current) {
+                    skipNextAuthEvent.current = false;
+                    if (session) setSession(session);
+                    return;
+                }
                 if (session?.user) {
                     const { role, tenant_id } = await fetchUserRoleAndTenant(session.user.id);
                     setUser(buildUserType(session.user, role, tenant_id));
@@ -135,11 +143,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error("No active session. Please log in again.");
         }
 
+        // Flag to prevent onAuthStateChange from overwriting our state
+        skipNextAuthEvent.current = true;
+
         const { error } = await supabase.auth.updateUser({ 
             password: newPassword,
             data: { needs_password_change: false }
         });
-        if (error) throw new Error(error.message || "Failed to update password");
+        if (error) {
+            skipNextAuthEvent.current = false;
+            throw new Error(error.message || "Failed to update password");
+        }
 
         setUser({ ...user, needs_password_change: false });
     };

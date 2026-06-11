@@ -14,10 +14,11 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/src/context/AuthContext";
+import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ChangePasswordScreen() {
-    const { updatePassword } = useAuth();
+    const { updatePassword, user } = useAuth();
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showNew, setShowNew] = useState(false);
@@ -38,9 +39,15 @@ export default function ChangePasswordScreen() {
         setLoading(true);
         try {
             await updatePassword(newPassword);
+            // Navigate to dashboard after successful password change
+            const dashboard = user?.role === "parent" 
+                ? "/(parent)/dashboard" 
+                : "/(driver)/dashboard";
+            setTimeout(() => {
+                router.replace(dashboard as any);
+            }, 300);
         } catch (e: any) {
             setError(e.message || "Failed to update password.");
-        } finally {
             setLoading(false);
         }
     };
