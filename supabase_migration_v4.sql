@@ -32,8 +32,8 @@ DECLARE
     v_user_id UUID;
     v_email TEXT;
 BEGIN
-    -- Only allow admins to execute this RPC
-    IF public.get_current_role() != 'admin' THEN
+    -- Only allow admins to execute this RPC (securely coalesce to block anonymous calls)
+    IF COALESCE(public.get_current_role(), '') != 'admin' THEN
         RAISE EXCEPTION 'Only school administrators can create accounts.';
     END IF;
 
@@ -60,7 +60,11 @@ BEGIN
         raw_app_meta_data,
         raw_user_meta_data,
         created_at,
-        updated_at
+        updated_at,
+        confirmation_token,
+        email_change,
+        email_change_token_new,
+        recovery_token
     ) VALUES (
         '00000000-0000-0000-0000-000000000000',
         v_user_id,
@@ -70,9 +74,13 @@ BEGIN
         crypt(p_password, gen_salt('bf')),
         now(),
         '{"provider":"email","providers":["email"]}',
-        jsonb_build_object('name', p_name, 'needs_password_change', true),
+        jsonb_build_object('name', p_name, 'needs_password_change', true, 'email_verified', true),
         now(),
-        now()
+        now(),
+        '',
+        '',
+        '',
+        ''
     );
 
     -- Assign role mapping in public.user_roles

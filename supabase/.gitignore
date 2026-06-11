@@ -1,0 +1,24 @@
+# Supabase Local State
+.branches
+.temp
+
+# Environment Files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env*.local
+
+# dotenvx Keys
+.env.keys
+.env.keys.*
+
+# Local Node Modules (if any in functions)
+node_modules/
+functions/**/node_modules/
+
+# Secrets and Credentials
+*.json
+!config.toml
+!package.json

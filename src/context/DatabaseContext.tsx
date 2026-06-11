@@ -192,37 +192,39 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(true);
         setError(null);
         try {
-            const driverList = await loadDrivers();
-            setDrivers(driverList);
+            // Fetch non-dependent datasets in parallel
+            const [driverList, routeList, paymentList, parentList, tenantResult] = await Promise.all([
+                loadDrivers(),
+                loadRoutes(),
+                loadPayments(),
+                loadParentProfiles(),
+                user?.tenant_id 
+                    ? supabase.from("tenants").select("common_password").eq("id", user.tenant_id).single()
+                    : Promise.resolve({ data: null, error: null })
+            ]);
 
+            // Fetch buses (depends on driverList)
             const busList = await loadBuses(driverList);
-            setBuses(busList);
 
-            const routeList = await loadRoutes();
+            // Routes depend on buses
             const routeListWithBus = routeList.map(r => ({
                 ...r,
                 bus: busList.find(b => b.id === r.bus_id)
             }));
-            setRoutes(routeListWithBus);
 
+            // Students depend on buses and routes
             const studentList = await loadStudents(busList, routeListWithBus);
+
+            // Set states
+            setDrivers(driverList);
+            setBuses(busList);
+            setRoutes(routeListWithBus);
             setStudents(studentList);
-
-            const paymentList = await loadPayments();
             setPayments(paymentList);
-
-            const parentList = await loadParentProfiles();
             setParentProfiles(parentList);
 
-            if (isSupabaseConfigured && user?.tenant_id) {
-                const { data: tenantData } = await supabase
-                    .from("tenants")
-                    .select("common_password")
-                    .eq("id", user.tenant_id)
-                    .single();
-                if (tenantData?.common_password) {
-                    setCommonPassword(tenantData.common_password);
-                }
+            if (tenantResult?.data?.common_password) {
+                setCommonPassword(tenantResult.data.common_password);
             }
         } catch (e: any) {
             setError(e.message || "Failed to load data");
@@ -314,8 +316,11 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         }]).select().single();
 
         if (error) throw new Error(error.message);
-        if (data) await writeAuditLog("Driver Added", "drivers", data.id);
-        await refreshData();
+        if (data) {
+            setDrivers(prev => [...prev, data]);
+            writeAuditLog("Driver Added", "drivers", data.id);
+        }
+        refreshData();
     };
 
     const updateDriver = async (id: string, updates: Partial<Driver>) => {
@@ -613,8 +618,11 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         }]).select().single();
 
         if (error) throw new Error(error.message);
-        if (data) await writeAuditLog("Parent Profile Added", "parent_profiles", data.id);
-        await refreshParents();
+        if (data) {
+            setParentProfiles(prev => [...prev, data]);
+            writeAuditLog("Parent Profile Added", "parent_profiles", data.id);
+        }
+        refreshParents();
     };
 
     const updateParentProfile = async (id: string, updates: Partial<ParentProfile>) => {
