@@ -151,7 +151,9 @@ export default function AdminLayout() {
         { id: "buses", label: "Buses", icon: "bus" },
         { id: "routes", label: "Routes", icon: "map" },
         { id: "students", label: "Students", icon: "people" },
+        { id: "parents", label: "Parents", icon: "people-circle" },
         { id: "attendance", label: "Attendance Logs", icon: "calendar" },
+        { id: "audit-logs", label: "Audit Logs", icon: "shield-checkmark" },
         { id: "settings", label: "Settings & Billing", icon: "settings" },
     ];
 

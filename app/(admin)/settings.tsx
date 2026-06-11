@@ -46,8 +46,19 @@ function SettingRow({
 
 export default function SettingsScreen() {
     const { user, signOut, updateProfile } = useAuth();
-    const { buses, routes, students, updateRoute } = useDatabase();
+    const { buses, routes, students, updateRoute, commonPassword, updateCommonPassword } = useDatabase();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    // Security Credentials States
+    const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
+    const [newCommonPassword, setNewCommonPassword] = useState(commonPassword || "school123");
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+    React.useEffect(() => {
+        if (commonPassword) {
+            setNewCommonPassword(commonPassword);
+        }
+    }, [commonPassword]);
 
     // Stop Pricing Manager States
     const [isPricingExpanded, setIsPricingExpanded] = useState(false);
@@ -374,6 +385,72 @@ export default function SettingsScreen() {
                             ) : (
                                 <Text style={{ color: "#555", fontSize: 13, fontStyle: "italic", textAlign: "center", marginVertical: 10 }}>Select a route above to start editing stop fees.</Text>
                             )}
+                        </View>
+                    )}
+                </View>
+
+                {/* Security Settings Manager */}
+                <Text style={styles.sectionTitle}>SECURITY & CREDENTIALS</Text>
+                <View style={[styles.section, { padding: 16 }]}>
+                    <TouchableOpacity
+                        style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+                        onPress={() => setIsSecurityExpanded(!isSecurityExpanded)}
+                    >
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                            <View style={[styles.settingIcon, { backgroundColor: "rgba(255,23,68,0.15)", marginRight: 0 }]}>
+                                <Ionicons name="lock-closed-outline" size={18} color="#FF1744" />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingTitle, { fontSize: 15 }]}>Common Onboarding Password</Text>
+                                <Text style={styles.settingSubtitle}>For primary driver/parent login credentials</Text>
+                            </View>
+                        </View>
+                        <Ionicons
+                            name={isSecurityExpanded ? "chevron-up" : "chevron-down"}
+                            size={18}
+                            color="#888"
+                        />
+                    </TouchableOpacity>
+
+                    {isSecurityExpanded && (
+                        <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", paddingTop: 16, gap: 12 }}>
+                            <Text style={styles.pricingSublabel}>COMMON LOGIN PASSWORD</Text>
+                            <View style={styles.pricingInputWrap}>
+                                <Ionicons name="key-outline" size={15} color="#FF1744" style={{ marginRight: 8 }} />
+                                <TextInput
+                                    style={styles.pricingInput}
+                                    placeholder="Enter new common password"
+                                    placeholderTextColor="#333"
+                                    value={newCommonPassword}
+                                    onChangeText={setNewCommonPassword}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.pricingBtn, { width: "100%", backgroundColor: "rgba(255,23,68,0.15)", borderColor: "rgba(255,23,68,0.3)", height: 44 }]}
+                                onPress={async () => {
+                                    if (newCommonPassword.trim().length < 6) {
+                                        Alert.alert("Invalid Password", "Password must be at least 6 characters.");
+                                        return;
+                                    }
+                                    setIsUpdatingPassword(true);
+                                    try {
+                                        await updateCommonPassword?.(newCommonPassword.trim());
+                                        Alert.alert("Success", "Common onboarding password updated successfully!");
+                                    } catch (e: any) {
+                                        Alert.alert("Error", e.message || "Failed to update password.");
+                                    } finally {
+                                        setIsUpdatingPassword(false);
+                                    }
+                                }}
+                                disabled={isUpdatingPassword}
+                            >
+                                {isUpdatingPassword ? (
+                                    <ActivityIndicator color="#FF1744" />
+                                ) : (
+                                    <Text style={[styles.pricingBtnText, { color: "#FF1744" }]}>UPDATE COMMON PASSWORD</Text>
+                                )}
+                            </TouchableOpacity>
                         </View>
                     )}
                 </View>

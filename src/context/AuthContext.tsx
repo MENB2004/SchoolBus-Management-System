@@ -7,6 +7,8 @@ import React, {
 } from "react";
 import { supabase, AppRole } from "@/src/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
+import { MOCK_TENANT_ID } from "@/src/data/mockData";
+
 
 export type UserType = {
     id: string;
@@ -25,6 +27,7 @@ type AuthContextType = {
     updatePassword: (newPassword: string) => Promise<void>;
     signOut: () => Promise<void>;
     isLoading: boolean;
+    signInMockUser?: (role: AppRole, phoneOrEmail: string, name?: string, needsPasswordChange?: boolean) => void;
 };
 
 export const AuthContext = createContext<AuthContextType>(
@@ -147,8 +150,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(null);
     };
 
+    const signInMockUser = (role: AppRole, phoneOrEmail: string, name?: string, needsPasswordChange?: boolean) => {
+        const mockUser: UserType = {
+            id: `mock-user-${Date.now()}`,
+            name: name ?? (role === "admin" ? "Mock Admin" : role === "driver" ? "Ramesh Kumar" : "Rajesh Sharma"),
+            role,
+            tenant_id: MOCK_TENANT_ID,
+            email: role === "admin" ? phoneOrEmail : undefined,
+            needs_password_change: needsPasswordChange ?? (role !== "admin"),
+        };
+        const mockSession = {
+            access_token: "mock-token",
+            refresh_token: "mock-refresh",
+            expires_in: 3600,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            token_type: "bearer",
+            user: {
+                id: mockUser.id,
+                email: mockUser.email,
+                phone: role !== "admin" ? phoneOrEmail : undefined,
+                user_metadata: { 
+                    name: mockUser.name,
+                    needs_password_change: mockUser.needs_password_change
+                },
+                app_metadata: {},
+                aud: "authenticated",
+                created_at: new Date().toISOString(),
+            } as any
+        } as Session;
+        setUser(mockUser);
+        setSession(mockSession);
+    };
+
     return (
-        <AuthContext.Provider value={{ user, session, updateProfile, updatePassword, signOut, isLoading }}>
+        <AuthContext.Provider value={{ user, session, updateProfile, updatePassword, signOut, isLoading, signInMockUser }}>
             {children}
         </AuthContext.Provider>
     );

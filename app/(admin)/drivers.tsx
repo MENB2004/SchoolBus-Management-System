@@ -20,6 +20,7 @@ export default function DriversScreen() {
     const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
+    const [username, setUsername] = useState("");
     const [saving, setSaving] = useState(false);
 
     const filtered = useMemo(() => {
@@ -41,6 +42,7 @@ export default function DriversScreen() {
         setEditingDriver(null);
         setName("");
         setPhone("");
+        setUsername("");
         setModalVisible(true);
     };
 
@@ -48,20 +50,32 @@ export default function DriversScreen() {
         setEditingDriver(driver);
         setName(driver.name);
         setPhone(driver.phone);
+        setUsername(driver.username || "");
         setModalVisible(true);
     };
 
     const handleSave = async () => {
-        if (!name.trim() || !phone.trim()) {
-            Alert.alert("Required Fields", "Please enter both name and phone number.");
+        if (!name.trim() || !phone.trim() || (!editingDriver && !username.trim())) {
+            Alert.alert("Required Fields", "Please enter name, phone, and username.");
             return;
         }
+
+        if (!editingDriver && !/^[a-zA-Z0-9_]{3,20}$/.test(username.trim())) {
+            Alert.alert("Invalid Username", "Username must be 3-20 characters long and contain only letters, numbers, or underscores.");
+            return;
+        }
+
         setSaving(true);
         try {
             if (editingDriver) {
                 await updateDriver(editingDriver.id, { name: name.trim(), phone: phone.trim() });
             } else {
-                await addDriver({ name: name.trim(), phone: phone.trim(), user_id: null });
+                await addDriver({ 
+                    name: name.trim(), 
+                    phone: phone.trim(), 
+                    username: username.trim().toLowerCase(),
+                    user_id: null 
+                });
             }
             setModalVisible(false);
         } catch (e: any) {
@@ -167,6 +181,12 @@ export default function DriversScreen() {
                                         <Ionicons name="call-outline" size={12} color="#666" />
                                         <Text style={styles.driverPhone}>{d.phone}</Text>
                                     </View>
+                                    {d.username && (
+                                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
+                                            <Ionicons name="person-outline" size={10} color="#FFB800" />
+                                            <Text style={{ fontSize: 11, color: "#FFB800", fontWeight: "700" }}>@{d.username}</Text>
+                                        </View>
+                                    )}
                                 </View>
                                 <View style={styles.actions}>
                                     <TouchableOpacity style={styles.actionBtn} onPress={() => openEditModal(d)}>
@@ -222,6 +242,27 @@ export default function DriversScreen() {
                                         keyboardType="phone-pad"
                                     />
                                 </View>
+                            </View>
+
+                            <View style={styles.field}>
+                                <Text style={styles.label}>USERNAME *</Text>
+                                <View style={[styles.inputWrap, editingDriver && { opacity: 0.5 }]}>
+                                    <Ionicons name="person-outline" size={16} color="#555" style={styles.fieldIcon} />
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="e.g. ramesh123"
+                                        placeholderTextColor="#333"
+                                        value={username}
+                                        onChangeText={setUsername}
+                                        editable={!editingDriver}
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+                                {!editingDriver && (
+                                    <Text style={{ fontSize: 10, color: "#444", marginTop: 2 }}>
+                                        Will be used for primary login. Spaces/special characters not allowed.
+                                    </Text>
+                                )}
                             </View>
 
                             <TouchableOpacity onPress={handleSave} disabled={saving} activeOpacity={0.85} style={{ marginTop: 10 }}>

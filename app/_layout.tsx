@@ -50,9 +50,9 @@ function RouteGuard({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Force password change for drivers on first login
+        // Force password change for drivers and parents on first login
         const isChangePasswordRoute = group === "(auth)" && screen === "change-password";
-        if (user.role === "driver" && user.needs_password_change) {
+        if ((user.role === "driver" || user.role === "parent") && user.needs_password_change) {
             if (!isChangePasswordRoute) {
                 router.replace("/(auth)/change-password");
             }

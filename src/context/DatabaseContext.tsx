@@ -7,10 +7,10 @@ import React, {
     ReactNode,
 } from "react";
 import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
-import type { Bus, Route, Student, Payment, Driver, Attendance } from "@/src/lib/supabase";
+import type { Bus, Route, Student, Payment, Driver, Attendance, AuditLog, ParentStudent, ParentProfile } from "@/src/lib/supabase";
 import { 
     getDaysRemaining,
-    MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS, MOCK_DRIVERS, MOCK_TENANT_ID
+    MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS, MOCK_DRIVERS, MOCK_TENANT_ID, MOCK_PARENT_PROFILES
 } from "@/src/data/mockData";
 import { useAuth } from "@/src/context/AuthContext";
 
@@ -20,6 +20,8 @@ type DatabaseContextType = {
     students: Student[];
     payments: Payment[];
     drivers: Driver[];
+    parentProfiles: ParentProfile[];
+    auditLogs: AuditLog[];
     isLoading: boolean;
     error: string | null;
     refreshData: () => Promise<void>;
@@ -53,6 +55,22 @@ type DatabaseContextType = {
     markAttendance: (attendance: Omit<Attendance, "id" | "recorded_at" | "student" | "tenant_id">) => Promise<void>;
     getAttendanceByDate: (date: string) => Promise<Attendance[]>;
     getStudentAttendance: (studentId: string) => Promise<Attendance[]>;
+
+    // Parent management operations
+    addParentProfile: (parent: Omit<ParentProfile, "id" | "created_at" | "tenant_id">) => Promise<void>;
+    updateParentProfile: (id: string, updates: Partial<ParentProfile>) => Promise<void>;
+    deleteParentProfile: (id: string) => Promise<void>;
+    linkParentToStudent: (parentId: string, studentId: string) => Promise<void>;
+    unlinkParentFromStudent: (parentId: string, studentId: string) => Promise<void>;
+    getParentStudentLinks: (parentUserId: string) => Promise<ParentStudent[]>;
+    refreshParents: () => Promise<void>;
+
+    // Audit log operations
+    loadAuditLogs: () => Promise<void>;
+
+    // Common password configuration
+    commonPassword?: string;
+    updateCommonPassword?: (newPassword: string) => Promise<void>;
 };
 
 const DatabaseContext = createContext<DatabaseContextType>({} as DatabaseContextType);
@@ -76,8 +94,26 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     })));
     const [payments, setPayments] = useState<Payment[]>(isSupabaseConfigured ? [] : MOCK_PAYMENTS);
     const [drivers, setDrivers] = useState<Driver[]>(isSupabaseConfigured ? [] : MOCK_DRIVERS);
+    const [parentProfiles, setParentProfiles] = useState<ParentProfile[]>(isSupabaseConfigured ? [] : MOCK_PARENT_PROFILES);
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // ─── Audit Log Helper ─────────────────────────────────────────────────────
+    const writeAuditLog = async (action: string, tableName: string, recordId: string) => {
+        if (!isSupabaseConfigured) return;
+        try {
+            await supabase.from("audit_logs").insert([{
+                tenant_id: tenantId,
+                user_id: user?.id,
+                action,
+                table_name: tableName,
+                record_id: recordId,
+            }]);
+        } catch (e) {
+            console.log("Audit log write failed (non-fatal):", e);
+        }
+    };
 
     // ─── Data Loading (RLS handles tenant filtering on Supabase side) ─────────
 
@@ -135,6 +171,19 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         return (data ?? []) as Payment[];
     };
 
+    const loadParentProfiles = async (): Promise<ParentProfile[]> => {
+        const { data, error } = await supabase
+            .from("parent_profiles")
+            .select("*")
+            .order("name", { ascending: true });
+        if (error) {
+            // Table might not exist in older schemas — non-fatal
+            console.log("parent_profiles load skipped:", error.message);
+            return [];
+        }
+        return (data ?? []) as ParentProfile[];
+    };
+
     const refreshData = useCallback(async () => {
         if (!isSupabaseConfigured) {
             setIsLoading(false);
@@ -161,12 +210,26 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
             const paymentList = await loadPayments();
             setPayments(paymentList);
+
+            const parentList = await loadParentProfiles();
+            setParentProfiles(parentList);
+
+            if (isSupabaseConfigured && user?.tenant_id) {
+                const { data: tenantData } = await supabase
+                    .from("tenants")
+                    .select("common_password")
+                    .eq("id", user.tenant_id)
+                    .single();
+                if (tenantData?.common_password) {
+                    setCommonPassword(tenantData.common_password);
+                }
+            }
         } catch (e: any) {
             setError(e.message || "Failed to load data");
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [isSupabaseConfigured, user?.tenant_id]);
 
     useEffect(() => {
         refreshData();
@@ -203,6 +266,22 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     // ─── Driver Operations ────────────────────────────────────────────────────
 
+    const [commonPassword, setCommonPassword] = useState("school123");
+
+    const updateCommonPassword = async (newPassword: string) => {
+        if (!isSupabaseConfigured) {
+            setCommonPassword(newPassword);
+            return;
+        }
+        const { error } = await supabase
+            .from("tenants")
+            .update({ common_password: newPassword })
+            .eq("id", tenantId);
+        if (error) throw new Error(error.message);
+        setCommonPassword(newPassword);
+        await writeAuditLog("Common Password Updated", "tenants", tenantId);
+    };
+
     const addDriver = async (driver: Omit<Driver, "id" | "created_at" | "tenant_id">) => {
         if (!isSupabaseConfigured) {
             const newDriver: Driver = {
@@ -214,8 +293,28 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setDrivers(prev => [...prev, newDriver]);
             return;
         }
-        const { error } = await supabase.from("drivers").insert([{ ...driver, tenant_id: tenantId }]);
+
+        // 1. Create auth user first via RPC
+        const { data: userId, error: rpcError } = await supabase.rpc("create_auth_user", {
+            p_username: driver.username,
+            p_password: commonPassword,
+            p_role: "driver",
+            p_tenant_id: tenantId,
+            p_name: driver.name,
+            p_phone: driver.phone
+        });
+
+        if (rpcError) throw new Error(rpcError.message || "Failed to create auth credentials");
+
+        // 2. Insert driver record linking user_id
+        const { data, error } = await supabase.from("drivers").insert([{ 
+            ...driver, 
+            user_id: userId,
+            tenant_id: tenantId 
+        }]).select().single();
+
         if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Driver Added", "drivers", data.id);
         await refreshData();
     };
 
@@ -229,6 +328,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         const { tenant_id: _, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("drivers").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
+        await writeAuditLog("Driver Updated", "drivers", id);
         await refreshData();
     };
 
@@ -238,6 +338,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setBuses(prev => prev.map(b => b.driver_id === id ? { ...b, driver_id: null, driver: undefined } : b));
             return;
         }
+        await writeAuditLog("Driver Deleted", "drivers", id);
         const { error } = await supabase.from("drivers").delete().eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
@@ -257,8 +358,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setBuses(prev => [...prev, newBus]);
             return;
         }
-        const { error } = await supabase.from("buses").insert([{ ...bus, tenant_id: tenantId }]);
+        const { data, error } = await supabase.from("buses").insert([{ ...bus, tenant_id: tenantId }]).select().single();
         if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Bus Added", "buses", data.id);
         await refreshData();
     };
 
@@ -275,6 +377,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         const { driver: _, tenant_id: __, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("buses").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
+        await writeAuditLog("Bus Updated", "buses", id);
         await refreshData();
     };
 
@@ -284,6 +387,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setStudents(prev => prev.map(s => s.bus_id === id ? { ...s, bus_id: null, bus: undefined } : s));
             return;
         }
+        await writeAuditLog("Bus Deleted", "buses", id);
         const { error } = await supabase.from("buses").delete().eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
@@ -302,8 +406,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setRoutes(prev => [...prev, newRoute]);
             return;
         }
-        const { error } = await supabase.from("routes").insert([{ ...route, tenant_id: tenantId }]);
+        const { data, error } = await supabase.from("routes").insert([{ ...route, tenant_id: tenantId }]).select().single();
         if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Route Added", "routes", data.id);
         await refreshData();
     };
 
@@ -319,6 +424,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         const { tenant_id: _, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("routes").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
+        await writeAuditLog("Route Updated", "routes", id);
         await refreshData();
     };
 
@@ -328,6 +434,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setStudents(prev => prev.map(s => s.route_id === id ? { ...s, route_id: null, route: undefined } : s));
             return;
         }
+        await writeAuditLog("Route Deleted", "routes", id);
         const { error } = await supabase.from("routes").delete().eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
@@ -349,8 +456,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setStudents(prev => [...prev, newStudent]);
             return;
         }
-        const { error } = await supabase.from("students").insert([{ ...student, tenant_id: tenantId }]);
+        const { data, error } = await supabase.from("students").insert([{ ...student, tenant_id: tenantId }]).select().single();
         if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Student Added", "students", data.id);
         await refreshData();
     };
 
@@ -372,6 +480,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         const { bus: _, route: __, days_remaining: ___, tenant_id: ____, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("students").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
+        await writeAuditLog("Student Updated", "students", id);
         await refreshData();
     };
 
@@ -380,6 +489,7 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setStudents(prev => prev.filter(s => s.id !== id));
             return;
         }
+        await writeAuditLog("Student Deleted", "students", id);
         const { error } = await supabase.from("students").delete().eq("id", id);
         if (error) throw new Error(error.message);
         await refreshData();
@@ -411,8 +521,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             } : s));
             return;
         }
-        const { error } = await supabase.from("payments").insert([{ ...payment, tenant_id: tenantId }]);
+        const { data, error } = await supabase.from("payments").insert([{ ...payment, tenant_id: tenantId }]).select().single();
         if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Payment Recorded", "payments", data.id);
         await refreshData();
     };
 
@@ -437,8 +548,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             console.log("Mock attendance marked:", attendance);
             return;
         }
-        const { error } = await supabase.from("attendance").insert([{ ...attendance, tenant_id: tenantId }]);
+        const { data, error } = await supabase.from("attendance").insert([{ ...attendance, tenant_id: tenantId }]).select().single();
         if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Attendance Marked", "attendance", data.id);
     };
 
     const getAttendanceByDate = async (date: string): Promise<Attendance[]> => {
@@ -467,6 +579,131 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         return (data ?? []) as Attendance[];
     };
 
+    // ─── Parent Management Operations ──────────────────────────────────────
+
+    const addParentProfile = async (parent: Omit<ParentProfile, "id" | "created_at" | "tenant_id">) => {
+        if (!isSupabaseConfigured) {
+            const newParent: ParentProfile = {
+                ...parent,
+                id: `parent-${Date.now()}`,
+                tenant_id: tenantId,
+                created_at: new Date().toISOString(),
+            };
+            setParentProfiles(prev => [...prev, newParent]);
+            return;
+        }
+
+        // 1. Create auth user first via RPC
+        const { data: userId, error: rpcError } = await supabase.rpc("create_auth_user", {
+            p_username: parent.username,
+            p_password: commonPassword,
+            p_role: "parent",
+            p_tenant_id: tenantId,
+            p_name: parent.name,
+            p_phone: parent.phone
+        });
+
+        if (rpcError) throw new Error(rpcError.message || "Failed to create auth credentials");
+
+        // 2. Insert parent profile record linking user_id
+        const { data, error } = await supabase.from("parent_profiles").insert([{ 
+            ...parent, 
+            user_id: userId,
+            tenant_id: tenantId 
+        }]).select().single();
+
+        if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Parent Profile Added", "parent_profiles", data.id);
+        await refreshParents();
+    };
+
+    const updateParentProfile = async (id: string, updates: Partial<ParentProfile>) => {
+        if (!isSupabaseConfigured) {
+            setParentProfiles(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+            return;
+        }
+        const { tenant_id: _, ...safeUpdates } = updates as any;
+        const { error } = await supabase.from("parent_profiles").update(safeUpdates).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Parent Profile Updated", "parent_profiles", id);
+        await refreshParents();
+    };
+
+    const deleteParentProfile = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setParentProfiles(prev => prev.filter(p => p.id !== id));
+            return;
+        }
+        await writeAuditLog("Parent Profile Deleted", "parent_profiles", id);
+        const { error } = await supabase.from("parent_profiles").delete().eq("id", id);
+        if (error) throw new Error(error.message);
+        await refreshParents();
+    };
+
+    const linkParentToStudent = async (parentId: string, studentId: string) => {
+        if (!isSupabaseConfigured) {
+            console.log("Mock: linked parent to student", parentId, studentId);
+            return;
+        }
+        const { data, error } = await supabase.from("parent_students").insert([{
+            tenant_id: tenantId,
+            parent_id: parentId,
+            student_id: studentId,
+        }]).select().single();
+        if (error) throw new Error(error.message);
+        if (data) await writeAuditLog("Parent Linked to Student", "parent_students", data.id);
+    };
+
+    const unlinkParentFromStudent = async (parentId: string, studentId: string) => {
+        if (!isSupabaseConfigured) {
+            console.log("Mock: unlinked parent from student", parentId, studentId);
+            return;
+        }
+        // Log before delete
+        await writeAuditLog("Parent Unlinked from Student", "parent_students", studentId);
+        const { error } = await supabase.from("parent_students").delete()
+            .eq("parent_id", parentId)
+            .eq("student_id", studentId);
+        if (error) throw new Error(error.message);
+    };
+
+    const getParentStudentLinks = async (parentUserId: string): Promise<ParentStudent[]> => {
+        if (!isSupabaseConfigured) return [];
+        const { data, error } = await supabase
+            .from("parent_students")
+            .select("*")
+            .eq("parent_id", parentUserId);
+        if (error) throw new Error(error.message);
+        return (data ?? []) as ParentStudent[];
+    };
+
+    const refreshParents = async () => {
+        if (!isSupabaseConfigured) return;
+        try {
+            const parentList = await loadParentProfiles();
+            setParentProfiles(parentList);
+        } catch (e) {
+            console.log("Failed to refresh parents:", e);
+        }
+    };
+
+    // ─── Audit Log Operations ─────────────────────────────────────────────────
+
+    const loadAuditLogs = async () => {
+        if (!isSupabaseConfigured) return;
+        try {
+            const { data, error } = await supabase
+                .from("audit_logs")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(200);
+            if (error) throw error;
+            setAuditLogs((data ?? []) as AuditLog[]);
+        } catch (e: any) {
+            console.log("Failed to load audit logs:", e.message);
+        }
+    };
+
     return (
         <DatabaseContext.Provider value={{
             buses,
@@ -474,6 +711,8 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             students,
             payments,
             drivers,
+            parentProfiles,
+            auditLogs,
             isLoading,
             error,
             refreshData,
@@ -495,6 +734,16 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             markAttendance,
             getAttendanceByDate,
             getStudentAttendance,
+            addParentProfile,
+            updateParentProfile,
+            deleteParentProfile,
+            linkParentToStudent,
+            unlinkParentFromStudent,
+            getParentStudentLinks,
+            refreshParents,
+            loadAuditLogs,
+            commonPassword,
+            updateCommonPassword,
         }}>
             {children}
         </DatabaseContext.Provider>

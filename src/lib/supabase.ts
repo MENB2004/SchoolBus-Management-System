@@ -60,6 +60,7 @@ export type Tenant = {
     subscription_plan: "free" | "basic" | "premium" | "enterprise";
     subscription_status: "active" | "trialing" | "past_due" | "canceled";
     contact_email: string;
+    common_password?: string;
     created_at: string;
 };
 
@@ -76,6 +77,7 @@ export type Driver = {
     user_id: string | null;
     name: string;
     phone: string;
+    username?: string;
     created_at: string;
 };
 
@@ -170,6 +172,16 @@ export type AuditLog = {
     created_at: string;
 };
 
+export type ParentProfile = {
+    id: string;
+    tenant_id: string;
+    user_id: string | null;
+    name: string;
+    phone: string;
+    username?: string;
+    created_at: string;
+};
+
 // ─── Database Schema Type (for Supabase client typing) ───────────────────────
 
 export type Database = {
@@ -178,6 +190,7 @@ export type Database = {
             tenants: { Row: Tenant };
             user_roles: { Row: UserRole };
             drivers: { Row: Driver };
+            parent_profiles: { Row: ParentProfile };
             buses: { Row: Omit<Bus, "driver"> };
             routes: { Row: Omit<Route, "bus"> };
             students: { Row: Omit<Student, "route" | "bus" | "days_remaining"> };

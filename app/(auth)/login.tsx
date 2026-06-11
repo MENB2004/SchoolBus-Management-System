@@ -12,18 +12,22 @@ import {
     StatusBar,
     Dimensions,
     Image,
+    Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "@/src/context/AuthContext";
+import { useDatabase } from "@/src/context/DatabaseContext";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/src/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
+
 
 const { width, height } = Dimensions.get("window");
 
 export default function LoginScreen() {
-    const { user } = useAuth();
-    const [email, setEmail] = useState("");
+    const { user, signInMockUser } = useAuth();
+    const { drivers, parentProfiles } = useDatabase();
+    const [emailOrUsername, setEmailOrUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
@@ -61,8 +65,53 @@ export default function LoginScreen() {
         setError("");
         setLoading(true);
         try {
+            const inputVal = emailOrUsername.trim();
+            if (!inputVal) {
+                setError("Please enter your email or username.");
+                shake();
+                return;
+            }
+
+            if (!password) {
+                setError("Please enter your password.");
+                shake();
+                return;
+            }
+
+            // Normalizing username: if it has no '@', append '@school.com'
+            let normalizedEmail = inputVal.toLowerCase();
+            if (!normalizedEmail.includes("@")) {
+                normalizedEmail = `${normalizedEmail}@school.com`;
+            }
+
+            if (!isSupabaseConfigured) {
+                const username = inputVal.toLowerCase();
+                if (username === "admin" && password === "admin123") {
+                    signInMockUser?.("admin", "admin@school.com", "Mock Admin", false);
+                    return;
+                }
+                
+                // Check in local drivers
+                const matchedDriver = drivers.find(d => d.username?.toLowerCase() === username);
+                if (matchedDriver && password === "school123") {
+                    signInMockUser?.("driver", `${username}@school.com`, matchedDriver.name, true);
+                    return;
+                }
+
+                // Check in local parent profiles
+                const matchedParent = parentProfiles.find(p => p.username?.toLowerCase() === username);
+                if (matchedParent && password === "school123") {
+                    signInMockUser?.("parent", `${username}@school.com`, matchedParent.name, true);
+                    return;
+                }
+
+                setError("Mock Mode: Use admin/admin123, ramesh/school123, or rajesh/school123");
+                shake();
+                return;
+            }
+
             const { error: authError } = await supabase.auth.signInWithPassword({
-                email: email.trim().toLowerCase(),
+                email: normalizedEmail,
                 password,
             });
 
@@ -141,24 +190,23 @@ export default function LoginScreen() {
                                 Access your fleet dashboard
                             </Text>
 
-                            {/* Email input */}
+                            {/* Email/Username input */}
                             <View style={styles.inputGroup}>
-                                <Text style={styles.label}>EMAIL</Text>
+                                <Text style={styles.label}>EMAIL OR USERNAME</Text>
                                 <View style={styles.inputWrap}>
                                     <Ionicons
-                                        name="mail-outline"
+                                        name="person-outline"
                                         size={16}
                                         color="#555"
                                         style={styles.inputIcon}
                                     />
                                     <TextInput
                                         style={styles.input}
-                                        placeholder="your@school.edu"
+                                        placeholder="yourname or mail@school.edu"
                                         placeholderTextColor="#333"
-                                        value={email}
-                                        onChangeText={setEmail}
+                                        value={emailOrUsername}
+                                        onChangeText={setEmailOrUsername}
                                         autoCapitalize="none"
-                                        keyboardType="email-address"
                                         returnKeyType="next"
                                     />
                                 </View>
@@ -230,7 +278,7 @@ export default function LoginScreen() {
                                         <>
                                             <Ionicons name="bus" size={18} color="#0A0A0F" />
                                             <Text style={styles.loginBtnText}>
-                                                LET&apos;S RIDE
+                                                LET'S RIDE
                                             </Text>
                                             <Ionicons
                                                 name="arrow-forward"
@@ -242,6 +290,7 @@ export default function LoginScreen() {
                                 </LinearGradient>
                             </TouchableOpacity>
                         </Animated.View>
+
 
                         {/* Register School Link */}
                         <TouchableOpacity 
@@ -439,4 +488,48 @@ const styles = StyleSheet.create({
         marginTop: 28,
         fontWeight: "600",
     },
+    tabContainer: {
+        flexDirection: "row",
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderRadius: 14,
+        padding: 4,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.05)",
+    },
+    tab: {
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        paddingVertical: 12,
+        borderRadius: 10,
+    },
+    activeTab: {
+        backgroundColor: "#FFB800",
+    },
+    tabText: {
+        fontSize: 11,
+        fontWeight: "900",
+        color: "#666",
+        letterSpacing: 1,
+    },
+    activeTabText: {
+        color: "#0A0A0F",
+    },
+    fieldHelp: {
+        fontSize: 11,
+        color: "#3F4F72",
+        marginTop: 6,
+        lineHeight: 14,
+        fontWeight: "500",
+    },
+    editPhoneLink: {
+        fontSize: 11,
+        fontWeight: "800",
+        color: "#FFB800",
+        textDecorationLine: "underline",
+    },
 });
+

@@ -9,13 +9,14 @@ export type {
     Route,
     Student,
     ParentStudent,
+    ParentProfile,
     Payment,
     Attendance,
     AuditLog,
     AppRole,
 } from "@/src/lib/supabase";
 
-import type { Bus, Route, Student, Payment, Driver } from "@/src/lib/supabase";
+import type { Bus, Route, Student, Payment, Driver, ParentProfile } from "@/src/lib/supabase";
 
 // ─── Fee Status Types ─────────────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ export const MOCK_DRIVERS: Driver[] = [
         user_id: null,
         name: "Ramesh Kumar",
         phone: "9876543210",
+        username: "ramesh",
         created_at: new Date().toISOString(),
     },
     {
@@ -112,6 +114,7 @@ export const MOCK_DRIVERS: Driver[] = [
         user_id: null,
         name: "Suresh Singh",
         phone: "9876543211",
+        username: "suresh",
         created_at: new Date().toISOString(),
     },
     {
@@ -120,6 +123,28 @@ export const MOCK_DRIVERS: Driver[] = [
         user_id: null,
         name: "Mahesh Yadav",
         phone: "9876543212",
+        username: "mahesh",
+        created_at: new Date().toISOString(),
+    },
+];
+
+export const MOCK_PARENT_PROFILES: ParentProfile[] = [
+    {
+        id: "parent-1",
+        tenant_id: MOCK_TENANT_ID,
+        user_id: null,
+        name: "Rajesh Sharma",
+        phone: "9988776655",
+        username: "rajesh",
+        created_at: new Date().toISOString(),
+    },
+    {
+        id: "parent-2",
+        tenant_id: MOCK_TENANT_ID,
+        user_id: null,
+        name: "Sunita Iyer",
+        phone: "9988776656",
+        username: "sunita",
         created_at: new Date().toISOString(),
     },
 ];
