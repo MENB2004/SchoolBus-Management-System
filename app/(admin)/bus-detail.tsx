@@ -80,7 +80,7 @@ export default function BusDetailScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.editBtn}
-                        onPress={() => router.push({ pathname: "/edit-bus", params: { id: bus.id } })}
+                        onPress={() => router.push({ pathname: "/(admin)/edit-bus", params: { id: bus.id } })}
                     >
                         <Ionicons name="create-outline" size={18} color="#FFB800" />
                     </TouchableOpacity>
@@ -162,7 +162,7 @@ export default function BusDetailScreen() {
                             <TouchableOpacity
                                 key={route.id}
                                 style={styles.routeCard}
-                                onPress={() => router.push({ pathname: "/route-detail", params: { id: route.id } })}
+                                onPress={() => router.push({ pathname: "/(admin)/route-detail", params: { id: route.id } })}
                                 activeOpacity={0.8}
                             >
                                 <View style={styles.routeIconWrap}>
@@ -182,7 +182,7 @@ export default function BusDetailScreen() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeaderRow}>
                         <Text style={styles.sectionTitle}>STUDENTS ({busStudents.length})</Text>
-                        <TouchableOpacity onPress={() => router.push({ pathname: "/add-student" })}>
+                        <TouchableOpacity onPress={() => router.push({ pathname: "/(admin)/add-student" })}>
                             <Text style={styles.addLink}>+ Add</Text>
                         </TouchableOpacity>
                     </View>
@@ -198,7 +198,7 @@ export default function BusDetailScreen() {
                                 <TouchableOpacity
                                     key={s.id}
                                     style={styles.studentRow}
-                                    onPress={() => router.push({ pathname: "/student-detail", params: { id: s.id } })}
+                                    onPress={() => router.push({ pathname: "/(admin)/student-detail", params: { id: s.id } })}
                                     activeOpacity={0.8}
                                 >
                                     <View style={[styles.studentAvatar, { backgroundColor: colors.bg, borderColor: colors.ring }]}>

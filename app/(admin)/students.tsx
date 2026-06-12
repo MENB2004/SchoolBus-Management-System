@@ -20,7 +20,7 @@ function StudentCard({ student }: { student: Student }) {
         <TouchableOpacity
             style={styles.card}
             onPressIn={blurActiveElement}
-            onPress={() => runAfterBlur(() => router.push({ pathname: "/student-detail", params: { id: student.id } }))}
+            onPress={() => runAfterBlur(() => router.push({ pathname: "/(admin)/student-detail", params: { id: student.id } }))}
             activeOpacity={0.85}
             {...webNonFocusableProps}
         >
@@ -117,7 +117,7 @@ export default function StudentsScreen() {
                     <Text style={styles.title}>Students</Text>
                 </View>
                 <TouchableOpacity
-                    onPress={() => router.push("/add-student")}
+                    onPress={() => router.push("/(admin)/add-student")}
                     {...webNonFocusableProps}
                 >
                     <LinearGradient colors={["#00C853", "#00E676"]} style={styles.addBtnGrad}>

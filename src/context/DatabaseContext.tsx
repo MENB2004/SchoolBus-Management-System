@@ -10,7 +10,7 @@ import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
 import type { Bus, Route, Student, Payment, Driver, Attendance, AuditLog, ParentStudent, ParentProfile } from "@/src/lib/supabase";
 import { 
     getDaysRemaining,
-    MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS, MOCK_DRIVERS, MOCK_TENANT_ID, MOCK_PARENT_PROFILES
+    MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS, MOCK_DRIVERS, MOCK_TENANT_ID, MOCK_PARENT_PROFILES, MOCK_ATTENDANCE
 } from "@/src/data/mockData";
 import { useAuth } from "@/src/context/AuthContext";
 
@@ -50,11 +50,13 @@ type DatabaseContextType = {
     addDriver: (driver: Omit<Driver, "id" | "created_at" | "tenant_id">) => Promise<void>;
     updateDriver: (id: string, updates: Partial<Driver>) => Promise<void>;
     deleteDriver: (id: string) => Promise<void>;
+    generateDriverLogin: (driverId: string, username: string) => Promise<void>;
 
     // Attendance operations
     markAttendance: (attendance: Omit<Attendance, "id" | "recorded_at" | "student" | "tenant_id">) => Promise<void>;
     getAttendanceByDate: (date: string) => Promise<Attendance[]>;
     getStudentAttendance: (studentId: string) => Promise<Attendance[]>;
+    getAttendanceByDateRange: (startDate: string, endDate: string) => Promise<Attendance[]>;
 
     // Parent management operations
     addParentProfile: (parent: Omit<ParentProfile, "id" | "created_at" | "tenant_id">) => Promise<void>;
@@ -349,6 +351,38 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         await refreshData();
     };
 
+    const generateDriverLogin = async (driverId: string, username: string) => {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) throw new Error("Driver not found");
+
+        if (!isSupabaseConfigured) {
+            const updatedDriver = { ...driver, username, user_id: `mock-user-${Date.now()}` };
+            setDrivers(prev => prev.map(d => d.id === driverId ? updatedDriver : d));
+            return;
+        }
+
+        const { data: userId, error: rpcError } = await supabase.rpc("create_auth_user", {
+            p_username: username,
+            p_password: commonPassword,
+            p_role: "driver",
+            p_tenant_id: tenantId,
+            p_name: driver.name,
+            p_phone: driver.phone
+        });
+
+        if (rpcError) throw new Error(rpcError.message || "Failed to create auth credentials");
+
+        const { error: updateError } = await supabase
+            .from("drivers")
+            .update({ username, user_id: userId })
+            .eq("id", driverId);
+
+        if (updateError) throw new Error(updateError.message || "Failed to update driver details");
+
+        await writeAuditLog("Driver Auth Generated", "drivers", driverId);
+        await refreshData();
+    };
+
     // ─── Bus Operations ───────────────────────────────────────────────────────
 
     const addBus = async (bus: Omit<Bus, "id" | "created_at" | "driver" | "tenant_id">) => {
@@ -420,15 +454,32 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     const updateRoute = async (id: string, updates: Partial<Route>) => {
         if (!isSupabaseConfigured) {
             setRoutes(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-            setStudents(prev => prev.map(s => s.route_id === id ? { 
-                ...s, 
-                route: { ...s.route, ...updates } as Route 
-            } : s));
+            setStudents(prev => prev.map(s => {
+                if (s.route_id === id) {
+                    const updatedStudent = {
+                        ...s,
+                        route: { ...s.route, ...updates } as Route,
+                    };
+                    if (updates.hasOwnProperty("bus_id")) {
+                        updatedStudent.bus_id = updates.bus_id ?? null;
+                        updatedStudent.bus = buses.find(b => b.id === updates.bus_id);
+                    }
+                    return updatedStudent;
+                }
+                return s;
+            }));
             return;
         }
         const { tenant_id: _, ...safeUpdates } = updates as any;
         const { error } = await supabase.from("routes").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
+        if (updates.hasOwnProperty("bus_id")) {
+            const { error: studentError } = await supabase
+                .from("students")
+                .update({ bus_id: updates.bus_id })
+                .eq("route_id", id);
+            if (studentError) throw new Error(studentError.message);
+        }
         await writeAuditLog("Route Updated", "routes", id);
         await refreshData();
     };
@@ -448,20 +499,29 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     // ─── Student Operations ───────────────────────────────────────────────────
 
     const addStudent = async (student: Omit<Student, "id" | "created_at" | "route" | "bus" | "days_remaining" | "tenant_id">) => {
+        let finalBusId = student.bus_id;
+        if (student.route_id) {
+            const route = routes.find(r => r.id === student.route_id);
+            if (route) {
+                finalBusId = route.bus_id;
+            }
+        }
+
         if (!isSupabaseConfigured) {
             const newStudent: Student = {
                 ...student,
+                bus_id: finalBusId,
                 id: `student-${Date.now()}`,
                 tenant_id: tenantId,
                 created_at: new Date().toISOString(),
-                bus: buses.find(b => b.id === student.bus_id),
+                bus: buses.find(b => b.id === finalBusId),
                 route: routes.find(r => r.id === student.route_id),
                 days_remaining: getDaysRemaining(student.fee_paid_until)
             };
             setStudents(prev => [...prev, newStudent]);
             return;
         }
-        const { data, error } = await supabase.from("students").insert([{ ...student, tenant_id: tenantId }]).select().single();
+        const { data, error } = await supabase.from("students").insert([{ ...student, bus_id: finalBusId, tenant_id: tenantId }]).select().single();
         if (error) throw new Error(error.message);
         if (data) await writeAuditLog("Student Added", "students", data.id);
         await refreshData();
@@ -473,6 +533,14 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setStudents(prev => prev.map(s => {
                 if (s.id !== id) return s;
                 const nextVal = { ...s, ...safeUpdates };
+                if (updates.hasOwnProperty("route_id")) {
+                    if (updates.route_id) {
+                        const route = routes.find(r => r.id === updates.route_id);
+                        nextVal.bus_id = route ? route.bus_id : null;
+                    } else {
+                        nextVal.bus_id = null;
+                    }
+                }
                 return {
                     ...nextVal,
                     bus: buses.find(b => b.id === nextVal.bus_id),
@@ -483,6 +551,14 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
         const { bus: _, route: __, days_remaining: ___, tenant_id: ____, ...safeUpdates } = updates as any;
+        if (updates.hasOwnProperty("route_id")) {
+            if (updates.route_id) {
+                const route = routes.find(r => r.id === updates.route_id);
+                safeUpdates.bus_id = route ? route.bus_id : null;
+            } else {
+                safeUpdates.bus_id = null;
+            }
+        }
         const { error } = await supabase.from("students").update(safeUpdates).eq("id", id);
         if (error) throw new Error(error.message);
         await writeAuditLog("Student Updated", "students", id);
@@ -547,19 +623,76 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
 
     // ─── Attendance Operations ────────────────────────────────────────────────
 
+    // In-memory mock attendance store for sandbox mode
+    const [mockAttendanceStore, setMockAttendanceStore] = useState<Attendance[]>(isSupabaseConfigured ? [] : MOCK_ATTENDANCE);
+
     const markAttendance = async (attendance: Omit<Attendance, "id" | "recorded_at" | "student" | "tenant_id">) => {
         if (!isSupabaseConfigured) {
-            // Mock: just log it
+            // Mock: store in-memory with upsert behavior
+            setMockAttendanceStore(prev => {
+                const existing = prev.findIndex(
+                    a => a.student_id === attendance.student_id && a.date === attendance.date
+                );
+                const record: Attendance = {
+                    ...attendance,
+                    id: existing >= 0 ? prev[existing].id : `att-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    tenant_id: tenantId,
+                    recorded_at: new Date().toISOString(),
+                };
+                if (existing >= 0) {
+                    const updated = [...prev];
+                    updated[existing] = record;
+                    return updated;
+                }
+                return [...prev, record];
+            });
             console.log("Mock attendance marked:", attendance);
             return;
         }
-        const { data, error } = await supabase.from("attendance").insert([{ ...attendance, tenant_id: tenantId }]).select().single();
-        if (error) throw new Error(error.message);
-        if (data) await writeAuditLog("Attendance Marked", "attendance", data.id);
+        // Upsert: update if (student_id, date) already exists, otherwise insert
+        const { data: existing } = await supabase
+            .from("attendance")
+            .select("id")
+            .eq("student_id", attendance.student_id)
+            .eq("date", attendance.date)
+            .maybeSingle();
+
+        if (existing) {
+            // Update existing record
+            const { error } = await supabase
+                .from("attendance")
+                .update({ status: attendance.status, recorded_by: attendance.recorded_by })
+                .eq("id", existing.id);
+            if (error) throw new Error(error.message);
+            await writeAuditLog("Attendance Updated", "attendance", existing.id);
+        } else {
+            // Insert new record
+            const { data, error } = await supabase
+                .from("attendance")
+                .insert([{ ...attendance, tenant_id: tenantId }])
+                .select()
+                .single();
+            if (error) throw new Error(error.message);
+            if (data) await writeAuditLog("Attendance Marked", "attendance", data.id);
+        }
     };
 
     const getAttendanceByDate = async (date: string): Promise<Attendance[]> => {
-        if (!isSupabaseConfigured) return [];
+        const resolveRecordedBy = (recordedBy: string) => {
+            const driver = drivers.find(d => d.user_id === recordedBy || d.id === recordedBy);
+            const parent = parentProfiles.find(p => p.user_id === recordedBy || p.id === recordedBy);
+            return driver?.name || parent?.name || (recordedBy === user?.id ? (user?.name || recordedBy) : recordedBy);
+        };
+
+        if (!isSupabaseConfigured) {
+            return mockAttendanceStore
+                .filter(a => a.date === date)
+                .map(a => ({
+                    ...a,
+                    student: students.find(s => s.id === a.student_id),
+                    recorded_by: resolveRecordedBy(a.recorded_by),
+                }));
+        }
         const { data, error } = await supabase
             .from("attendance")
             .select("*")
@@ -569,11 +702,27 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         return ((data ?? []) as Attendance[]).map(a => ({
             ...a,
             student: students.find(s => s.id === a.student_id),
+            recorded_by: resolveRecordedBy(a.recorded_by),
         }));
     };
 
     const getStudentAttendance = async (studentId: string): Promise<Attendance[]> => {
-        if (!isSupabaseConfigured) return [];
+        const resolveRecordedBy = (recordedBy: string) => {
+            const driver = drivers.find(d => d.user_id === recordedBy || d.id === recordedBy);
+            const parent = parentProfiles.find(p => p.user_id === recordedBy || p.id === recordedBy);
+            return driver?.name || parent?.name || (recordedBy === user?.id ? (user?.name || recordedBy) : recordedBy);
+        };
+
+        if (!isSupabaseConfigured) {
+            return mockAttendanceStore
+                .filter(a => a.student_id === studentId)
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .slice(0, 30)
+                .map(a => ({
+                    ...a,
+                    recorded_by: resolveRecordedBy(a.recorded_by),
+                }));
+        }
         const { data, error } = await supabase
             .from("attendance")
             .select("*")
@@ -581,7 +730,41 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             .order("date", { ascending: false })
             .limit(30);
         if (error) throw new Error(error.message);
-        return (data ?? []) as Attendance[];
+        return ((data ?? []) as Attendance[]).map(a => ({
+            ...a,
+            recorded_by: resolveRecordedBy(a.recorded_by),
+        }));
+    };
+
+    const getAttendanceByDateRange = async (startDate: string, endDate: string): Promise<Attendance[]> => {
+        const resolveRecordedBy = (recordedBy: string) => {
+            const driver = drivers.find(d => d.user_id === recordedBy || d.id === recordedBy);
+            const parent = parentProfiles.find(p => p.user_id === recordedBy || p.id === recordedBy);
+            return driver?.name || parent?.name || (recordedBy === user?.id ? (user?.name || recordedBy) : recordedBy);
+        };
+
+        if (!isSupabaseConfigured) {
+            return mockAttendanceStore
+                .filter(a => a.date >= startDate && a.date <= endDate)
+                .map(a => ({
+                    ...a,
+                    student: students.find(s => s.id === a.student_id),
+                    recorded_by: resolveRecordedBy(a.recorded_by),
+                }))
+                .sort((a, b) => b.date.localeCompare(a.date) || b.recorded_at.localeCompare(a.recorded_at));
+        }
+        const { data, error } = await supabase
+            .from("attendance")
+            .select("*")
+            .gte("date", startDate)
+            .lte("date", endDate)
+            .order("date", { ascending: false });
+        if (error) throw new Error(error.message);
+        return ((data ?? []) as Attendance[]).map(a => ({
+            ...a,
+            student: students.find(s => s.id === a.student_id),
+            recorded_by: resolveRecordedBy(a.recorded_by),
+        }));
     };
 
     // ─── Parent Management Operations ──────────────────────────────────────
@@ -739,9 +922,11 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             addDriver,
             updateDriver,
             deleteDriver,
+            generateDriverLogin,
             markAttendance,
             getAttendanceByDate,
             getStudentAttendance,
+            getAttendanceByDateRange,
             addParentProfile,
             updateParentProfile,
             deleteParentProfile,

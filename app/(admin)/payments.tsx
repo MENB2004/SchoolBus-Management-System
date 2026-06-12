@@ -227,7 +227,7 @@ export default function PaymentsScreen() {
                             <TouchableOpacity
                                 key={s.id}
                                 style={styles.studentRow}
-                                onPress={() => router.push({ pathname: "/student-detail", params: { id: s.id } })}
+                                onPress={() => router.push({ pathname: "/(admin)/student-detail", params: { id: s.id } })}
                                 activeOpacity={0.8}
                             >
                                 <View style={[styles.studentAvatar, { backgroundColor: colors.bg, borderColor: colors.ring }]}>

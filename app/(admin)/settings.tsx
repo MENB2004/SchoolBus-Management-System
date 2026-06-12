@@ -49,6 +49,40 @@ export default function SettingsScreen() {
     const { buses, routes, students, updateRoute, commonPassword, updateCommonPassword } = useDatabase();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+    // Edit Profile States
+    const [isProfileExpanded, setIsProfileExpanded] = useState(false);
+    const [profileName, setProfileName] = useState(user?.name || "");
+    const [profileEmail, setProfileEmail] = useState(user?.email || "");
+    const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+    React.useEffect(() => {
+        if (user) {
+            setProfileName(user.name || "");
+            setProfileEmail(user.email || "");
+        }
+    }, [user]);
+
+    const handleUpdateProfile = async () => {
+        if (!profileName.trim()) {
+            Alert.alert("Error", "Name cannot be empty.");
+            return;
+        }
+        if (!profileEmail.trim()) {
+            Alert.alert("Error", "Email cannot be empty.");
+            return;
+        }
+        setIsUpdatingProfile(true);
+        try {
+            await updateProfile(profileName.trim(), profileEmail.trim());
+            Alert.alert("Success", "Profile updated successfully!");
+            setIsProfileExpanded(false);
+        } catch (e: any) {
+            Alert.alert("Error", e.message || "Failed to update profile.");
+        } finally {
+            setIsUpdatingProfile(false);
+        }
+    };
+
     // Security Credentials States
     const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
     const [newCommonPassword, setNewCommonPassword] = useState(commonPassword || "school123");
@@ -195,6 +229,76 @@ export default function SettingsScreen() {
                             </View>
                         </View>
                     </LinearGradient>
+                </View>
+
+                {/* Edit Profile Section */}
+                <Text style={styles.sectionTitle}>EDIT PROFILE</Text>
+                <View style={[styles.section, { padding: 16 }]}>
+                    <TouchableOpacity
+                        style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+                        onPress={() => setIsProfileExpanded(!isProfileExpanded)}
+                    >
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                            <View style={[styles.settingIcon, { backgroundColor: "rgba(0,230,118,0.15)", marginRight: 0 }]}>
+                                <Ionicons name="person-outline" size={18} color="#00E676" />
+                            </View>
+                            <View>
+                                <Text style={[styles.settingTitle, { fontSize: 15 }]}>Edit Profile Details</Text>
+                                <Text style={styles.settingSubtitle}>Update name and email address</Text>
+                            </View>
+                        </View>
+                        <Ionicons
+                            name={isProfileExpanded ? "chevron-up" : "chevron-down"}
+                            size={18}
+                            color="#888"
+                        />
+                    </TouchableOpacity>
+
+                    {isProfileExpanded && (
+                        <View style={{ marginTop: 20, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", paddingTop: 16, gap: 16 }}>
+                            <View style={{ gap: 8 }}>
+                                <Text style={styles.pricingSublabel}>DISPLAY NAME</Text>
+                                <View style={styles.pricingInputWrap}>
+                                    <Ionicons name="person-outline" size={15} color="#00E676" style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={styles.pricingInput}
+                                        placeholder="Enter your name"
+                                        placeholderTextColor="#888"
+                                        value={profileName}
+                                        onChangeText={setProfileName}
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={{ gap: 8 }}>
+                                <Text style={styles.pricingSublabel}>EMAIL ADDRESS</Text>
+                                <View style={styles.pricingInputWrap}>
+                                    <Ionicons name="mail-outline" size={15} color="#00E676" style={{ marginRight: 8 }} />
+                                    <TextInput
+                                        style={styles.pricingInput}
+                                        placeholder="Enter email address"
+                                        placeholderTextColor="#888"
+                                        value={profileEmail}
+                                        onChangeText={setProfileEmail}
+                                        autoCapitalize="none"
+                                        keyboardType="email-address"
+                                    />
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.pricingBtn, { width: "100%", backgroundColor: "rgba(0,230,118,0.15)", borderColor: "rgba(0,230,118,0.3)", height: 44 }]}
+                                onPress={handleUpdateProfile}
+                                disabled={isUpdatingProfile}
+                            >
+                                {isUpdatingProfile ? (
+                                    <ActivityIndicator color="#00E676" />
+                                ) : (
+                                    <Text style={[styles.pricingBtnText, { color: "#00E676" }]}>UPDATE PROFILE</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
 
                 {/* Fleet Summary */}
@@ -483,7 +587,7 @@ export default function SettingsScreen() {
                         icon="cash-outline"
                         title="Payment Records"
                         subtitle="View and record payments"
-                        onPress={() => router.push("/payments")}
+                        onPress={() => router.push("/(admin)/payments")}
                         accent="#7C3AED"
                     />
                 </View>
@@ -495,21 +599,21 @@ export default function SettingsScreen() {
                         icon="add-circle-outline"
                         title="Add New Bus"
                         subtitle="Register a new bus to the fleet"
-                        onPress={() => router.push("/add-bus")}
+                        onPress={() => router.push("/(admin)/add-bus")}
                         accent="#FFB800"
                     />
                     <SettingRow
                         icon="git-branch-outline"
                         title="Add New Route"
                         subtitle="Create a new bus route"
-                        onPress={() => router.push("/add-route")}
+                        onPress={() => router.push("/(admin)/add-route")}
                         accent="#2E5A9F"
                     />
                     <SettingRow
                         icon="person-add-outline"
                         title="Add New Student"
                         subtitle="Enroll a new student"
-                        onPress={() => router.push("/add-student")}
+                        onPress={() => router.push("/(admin)/add-student")}
                         accent="#00E676"
                     />
                 </View>

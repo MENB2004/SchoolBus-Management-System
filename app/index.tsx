@@ -6,5 +6,6 @@ export default function Index() {
     if (isLoading) return null;
     if (!user) return <Redirect href="/(auth)/login" />;
     if (user.role === "admin") return <Redirect href="/(admin)/dashboard" />;
+    if (user.role === "parent") return <Redirect href="/(parent)/dashboard" />;
     return <Redirect href="/(driver)/dashboard" />;
 }

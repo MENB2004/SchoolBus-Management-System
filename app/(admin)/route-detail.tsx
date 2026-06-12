@@ -90,7 +90,7 @@ export default function RouteDetailScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.editBtn}
-                        onPress={() => router.push({ pathname: "/edit-route", params: { id: route.id } })}
+                        onPress={() => router.push({ pathname: "/(admin)/edit-route", params: { id: route.id } })}
                     >
                         <Ionicons name="create-outline" size={18} color="#2E5A9F" />
                     </TouchableOpacity>
@@ -189,7 +189,7 @@ export default function RouteDetailScreen() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeaderRow}>
                         <Text style={styles.sectionTitle}>STUDENTS ({routeStudents.length})</Text>
-                        <TouchableOpacity onPress={() => router.push({ pathname: "/add-student", params: { routeId: id } })}>
+                        <TouchableOpacity onPress={() => router.push({ pathname: "/(admin)/add-student", params: { routeId: id } })}>
                             <Text style={styles.addLink}>+ Enroll</Text>
                         </TouchableOpacity>
                     </View>
@@ -205,7 +205,7 @@ export default function RouteDetailScreen() {
                                 <TouchableOpacity
                                     key={s.id}
                                     style={styles.studentRow}
-                                    onPress={() => router.push({ pathname: "/student-detail", params: { id: s.id } })}
+                                    onPress={() => router.push({ pathname: "/(admin)/student-detail", params: { id: s.id } })}
                                     activeOpacity={0.8}
                                 >
                                     <View style={[styles.studentAvatar, { backgroundColor: colors.bg, borderColor: colors.ring }]}>

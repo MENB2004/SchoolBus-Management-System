@@ -11,7 +11,7 @@ import { blurActiveElement, runAfterBlur, webNonFocusableProps } from "@/src/uti
 import { Driver } from "@/src/lib/supabase";
 
 export default function DriversScreen() {
-    const { drivers, addDriver, updateDriver, deleteDriver, isLoading, refreshData } = useDatabase();
+    const { drivers, addDriver, updateDriver, deleteDriver, generateDriverLogin, isLoading, refreshData } = useDatabase();
     const [search, setSearch] = useState("");
     const [isRefreshing, setIsRefreshing] = useState(false);
     
@@ -106,6 +106,31 @@ export default function DriversScreen() {
         );
     };
 
+    const handlePromptGenerateLogin = (driver: Driver) => {
+        const cleanName = driver.name.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 10);
+        const suffix = driver.phone.replace(/[^0-9]/g, "").slice(-4);
+        const suggestedUsername = `${cleanName}${suffix || "drv"}`;
+
+        Alert.alert(
+            "Generate Login",
+            `Create login credentials for ${driver.name}?\n\nUsername: @${suggestedUsername}\nPassword: [Common Onboarding Password]`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Generate", 
+                    onPress: async () => {
+                        try {
+                            await generateDriverLogin(driver.id, suggestedUsername);
+                            Alert.alert("Success", `Login credentials generated for ${driver.name}!\nUsername: @${suggestedUsername}`);
+                        } catch (e: any) {
+                            Alert.alert("Error", e.message || "Failed to generate login credentials.");
+                        }
+                    } 
+                }
+            ]
+        );
+    };
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
@@ -181,11 +206,19 @@ export default function DriversScreen() {
                                         <Ionicons name="call-outline" size={12} color="#666" />
                                         <Text style={styles.driverPhone}>{d.phone}</Text>
                                     </View>
-                                    {d.username && (
+                                    {d.username ? (
                                         <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 }}>
                                             <Ionicons name="person-outline" size={10} color="#FFB800" />
                                             <Text style={{ fontSize: 11, color: "#FFB800", fontWeight: "700" }}>@{d.username}</Text>
                                         </View>
+                                    ) : (
+                                        <TouchableOpacity 
+                                            style={styles.generateBtn}
+                                            onPress={() => handlePromptGenerateLogin(d)}
+                                        >
+                                            <Ionicons name="key" size={10} color="#FFB800" />
+                                            <Text style={styles.generateBtnText}>GENERATE LOGIN</Text>
+                                        </TouchableOpacity>
                                     )}
                                 </View>
                                 <View style={styles.actions}>
@@ -419,4 +452,21 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     saveBtnText: { fontSize: 13, fontWeight: "900", color: "#0A0A0F", letterSpacing: 1.5 },
+    generateBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        marginTop: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: "rgba(255,184,0,0.1)",
+        alignSelf: "flex-start",
+    },
+    generateBtnText: {
+        fontSize: 10,
+        color: "#FFB800",
+        fontWeight: "800",
+        letterSpacing: 0.5,
+    },
 });

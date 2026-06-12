@@ -147,6 +147,8 @@ export default function ParentLayout() {
 
     const sidebarItems = [
         { id: "dashboard", label: "My Children", icon: "people" },
+        { id: "attendance", label: "Attendance History", icon: "calendar" },
+        { id: "payments", label: "Payment History", icon: "cash" },
     ];
 
     return (

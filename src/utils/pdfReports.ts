@@ -1,7 +1,7 @@
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { Platform, Alert } from "react-native";
-import type { Route, Student, Payment } from "@/src/data/mockData";
+import type { Route, Student, Payment, Attendance } from "@/src/data/mockData";
 import { getFeeStatus, FEE_COLORS } from "@/src/data/mockData";
 
 // ─── Shared Helpers ───────────────────────────────────────────────────────────
@@ -398,6 +398,103 @@ export function buildMonthlyPaymentReportHTML(
 
         <div class="footer">
             Bus Management System — Monthly Payment Report — ${month}
+        </div>
+    </body></html>`;
+}
+
+// ─── Attendance Report PDF ───────────────────────────────────────────────────
+
+export function buildAttendanceReportHTML(
+    startDate: string,
+    endDate: string,
+    records: Attendance[],
+    totalStudents: number
+): string {
+    let boarded = 0, dropped = 0, absent = 0;
+    records.forEach(r => {
+        if (r.status === "boarded") boarded++;
+        else if (r.status === "dropped") dropped++;
+        else if (r.status === "absent") absent++;
+    });
+
+    const totalMarked = records.length;
+    const attendanceRate = totalMarked > 0 
+        ? Math.round(((boarded + dropped) / totalMarked) * 100) 
+        : 0;
+
+    const dateRangeLabel = startDate === endDate 
+        ? new Date(startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+        : `${new Date(startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${new Date(endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
+
+    const rowsHTML = records.map(r => {
+        const statusClass = r.status === "boarded" 
+            ? "badge-paid" 
+            : r.status === "dropped" 
+            ? "badge-due" 
+            : "badge-overdue";
+        const statusLabel = r.status.toUpperCase();
+        const studentName = r.student?.name ?? "Unknown Student";
+        const classSection = r.student ? `${r.student.class} ${r.student.section ?? ""}` : "—";
+        const stopName = r.student?.boarding_stop ?? "—";
+        
+        return `
+        <tr>
+            <td style="font-weight: 700;">${new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
+            <td style="font-weight: 700;">${studentName}</td>
+            <td>Class ${classSection}</td>
+            <td>${stopName}</td>
+            <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+        </tr>`;
+    }).join("\n");
+
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${BASE_CSS}</style></head><body>
+        <div class="header">
+            <h1>📋 Attendance Report</h1>
+            <div class="subtitle">${dateRangeLabel}</div>
+            <div class="date">Generated on ${today()}</div>
+        </div>
+
+        <div class="summary-bar">
+            <div class="summary-stat">
+                <div class="num">${totalMarked}</div>
+                <div class="lbl">Total Marked</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" style="color:#2E7D32">${boarded}</div>
+                <div class="lbl">Boarded</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" style="color:#0288D1">${dropped}</div>
+                <div class="lbl">Dropped Off</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" style="color:#C62828">${absent}</div>
+                <div class="lbl">Absent</div>
+            </div>
+            <div class="summary-stat">
+                <div class="num" style="color:#E65100">${attendanceRate}%</div>
+                <div class="lbl">Attendance Rate</div>
+            </div>
+        </div>
+
+        <div class="section-title">Attendance Log Records</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Student Name</th>
+                    <th>Class</th>
+                    <th>Stop</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHTML || '<tr><td colspan="5" style="text-align:center;color:#999;padding:40px 0">No attendance logs found in this date range.</td></tr>'}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            Bus Management System — Attendance Report — ${dateRangeLabel}
         </div>
     </body></html>`;
 }

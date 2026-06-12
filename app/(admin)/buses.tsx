@@ -16,7 +16,7 @@ function BusCard({ bus, routeCount, studentCount }: { bus: Bus; routeCount: numb
         <TouchableOpacity
             style={styles.card}
             onPressIn={blurActiveElement}
-            onPress={() => runAfterBlur(() => router.push({ pathname: "/bus-detail", params: { id: bus.id } }))}
+            onPress={() => runAfterBlur(() => router.push({ pathname: "/(admin)/bus-detail", params: { id: bus.id } }))}
             activeOpacity={0.85}
             {...webNonFocusableProps}
         >
@@ -108,7 +108,7 @@ export default function BusesScreen() {
                 </View>
                 <TouchableOpacity
                     style={styles.addBtn}
-                    onPress={() => router.push("/add-bus")}
+                    onPress={() => router.push("/(admin)/add-bus")}
                     {...webNonFocusableProps}
                 >
                     <LinearGradient colors={["#FFB800", "#FF8C00"]} style={styles.addBtnInner}>

@@ -43,26 +43,17 @@ export default function ParentDashboardScreen() {
         }
     };
 
-    // 2. Fetch attendance for all associated children
+    // 2. Fetch attendance for all associated children using DatabaseContext
     const loadChildrenAttendance = async (ids: string[]) => {
         const mapping: { [studentId: string]: string } = {};
         const today = new Date().toISOString().split("T")[0];
         
         try {
             for (const id of ids) {
-                // Fetch attendance logs for this child
-                const { data, error } = await supabase
-                    .from("attendance")
-                    .select("status")
-                    .eq("student_id", id)
-                    .eq("date", today)
-                    .maybeSingle();
-                
-                if (data) {
-                    mapping[id] = data.status;
-                } else {
-                    mapping[id] = "Not Marked";
-                }
+                // Use DatabaseContext method (works in both mock and production)
+                const records = await getStudentAttendance(id);
+                const todayRecord = records.find(a => a.date === today);
+                mapping[id] = todayRecord?.status ?? "Not Marked";
             }
             setChildrenAttendance(mapping);
         } catch (e) {

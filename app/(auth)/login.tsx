@@ -291,10 +291,19 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                         </Animated.View>
 
+                        {/* Forgot Password Link */}
+                        <TouchableOpacity 
+                            style={{ alignSelf: "center", marginTop: 16 }}
+                            onPress={() => router.push("/(auth)/forgot-password")}
+                        >
+                            <Text style={{ color: "#888", fontWeight: "700", fontSize: 13, letterSpacing: 0.3 }}>
+                                Forgot Password?
+                            </Text>
+                        </TouchableOpacity>
 
                         {/* Register School Link */}
                         <TouchableOpacity 
-                            style={{ alignSelf: "center", marginTop: 20 }}
+                            style={{ alignSelf: "center", marginTop: 12 }}
                             onPress={() => router.push("/(auth)/register-school")}
                         >
                             <Text style={{ color: "#FFB800", fontWeight: "800", fontSize: 13, letterSpacing: 0.5 }}>

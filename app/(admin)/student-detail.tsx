@@ -214,7 +214,7 @@ export default function StudentDetailScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.editBtn}
-                        onPress={() => router.push({ pathname: "/edit-student", params: { id: student.id } })}
+                        onPress={() => router.push({ pathname: "/(admin)/edit-student", params: { id: student.id } })}
                     >
                         <Ionicons name="create-outline" size={18} color="#00E676" />
                     </TouchableOpacity>

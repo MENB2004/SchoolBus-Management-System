@@ -15,22 +15,24 @@ type TempAttendance = {
 
 export default function DriverAttendanceScreen() {
     const { user } = useAuth();
-    const { buses, students, markAttendance, getAttendanceByDate } = useDatabase();
+    const { buses, students, drivers, markAttendance, getAttendanceByDate } = useDatabase();
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [attendance, setAttendance] = useState<TempAttendance>({});
     const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-    // 1. Resolve Driver's Bus
-    let myBus = buses.find(b => b.driver?.name?.toLowerCase() === user?.name?.toLowerCase());
+    // 1. Resolve Driver's Bus via user_id (reliable) then fallback to name match
+    const myDriver = drivers.find(d => d.user_id === user?.id) 
+        ?? drivers.find(d => d.name?.toLowerCase() === user?.name?.toLowerCase());
+    let myBus = myDriver ? buses.find(b => b.driver_id === myDriver.id) : undefined;
     
     // Sandbox fallback
-    if (!myBus && (user?.email === "driver@school.com" || user?.name?.toLowerCase() === "driver")) {
+    if (!myBus && (user?.id?.startsWith("mock-") || user?.email === "driver@school.com")) {
         myBus = buses.find(b => b.status === "active");
     }
 
     const myStudents = useMemo(() => {
-        return myBus ? students.filter(s => s.bus_id === myBus.id && s.is_active) : [];
+        return myBus ? students.filter(s => s.bus_id === myBus!.id && s.is_active) : [];
     }, [myBus, students]);
 
     // 2. Load Existing Attendance for Today
@@ -73,7 +75,7 @@ export default function DriverAttendanceScreen() {
                         student_id: s.id,
                         date: today,
                         status: status,
-                        recorded_by: user?.name || "Driver"
+                        recorded_by: user?.id || ""
                     });
                 }
             }

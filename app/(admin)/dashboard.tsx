@@ -286,7 +286,7 @@ export default function AdminDashboard() {
                         <ActionGridItem
                             icon="add-circle"
                             title="Add Bus"
-                            onPress={() => router.push("/add-bus")}
+                            onPress={() => router.push("/(admin)/add-bus")}
                             accent="#FF8C00"
                         />
                         <ActionGridItem
@@ -298,13 +298,13 @@ export default function AdminDashboard() {
                         <ActionGridItem
                             icon="person-add"
                             title="Add Student"
-                            onPress={() => router.push("/add-student")}
+                            onPress={() => router.push("/(admin)/add-student")}
                             accent="#00C853"
                         />
                         <ActionGridItem
                             icon="cash"
                             title="Payments"
-                            onPress={() => router.push("/payments")}
+                            onPress={() => router.push("/(admin)/payments")}
                             accent="#7C3AED"
                         />
                         <ActionGridItem
@@ -316,7 +316,7 @@ export default function AdminDashboard() {
                         <ActionGridItem
                             icon="add-circle"
                             title="Add Route"
-                            onPress={() => router.push("/add-route")}
+                            onPress={() => router.push("/(admin)/add-route")}
                             accent="#E91E63"
                         />
                         <ActionGridItem

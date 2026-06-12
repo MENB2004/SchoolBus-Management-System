@@ -16,7 +16,7 @@ export type {
     AppRole,
 } from "@/src/lib/supabase";
 
-import type { Bus, Route, Student, Payment, Driver, ParentProfile } from "@/src/lib/supabase";
+import type { Bus, Route, Student, Payment, Driver, ParentProfile, Attendance } from "@/src/lib/supabase";
 
 // ─── Fee Status Types ─────────────────────────────────────────────────────────
 
@@ -53,9 +53,9 @@ export function getFeeStatus(daysRemaining: number): FeeStatus {
 
 /** Colors for each fee status */
 export const FEE_COLORS: Record<FeeStatus, { ring: string; bg: string; text: string; label: string }> = {
-    paid:    { ring: "#00E676", bg: "rgba(0,230,118,0.15)",   text: "#00E676", label: "Paid" },
-    due:     { ring: "#FFB300", bg: "rgba(255,179,0,0.15)",   text: "#FFB300", label: "Due Soon" },
-    overdue: { ring: "#FF1744", bg: "rgba(255,23,68,0.15)",   text: "#FF1744", label: "Overdue" },
+    paid: { ring: "#00E676", bg: "rgba(0,230,118,0.15)", text: "#00E676", label: "Paid" },
+    due: { ring: "#FFB300", bg: "rgba(255,179,0,0.15)", text: "#FFB300", label: "Due Soon" },
+    overdue: { ring: "#FF1744", bg: "rgba(255,23,68,0.15)", text: "#FF1744", label: "Overdue" },
 };
 
 /** Get formatted due date string */
@@ -278,3 +278,46 @@ export const MOCK_PAYMENTS: Payment[] = [
         created_at: new Date().toISOString(),
     },
 ];
+
+// Seed past 7 weekdays of attendance records for sandbox mode
+export const MOCK_ATTENDANCE: Attendance[] = [];
+const today = new Date();
+for (let i = 0; i < 15; i++) {
+    const d = new Date();
+    d.setDate(today.getDate() - i);
+    const dayOfWeek = d.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) continue; // skip weekends
+    const dateStr = d.toISOString().split("T")[0];
+
+    // student-1
+    MOCK_ATTENDANCE.push({
+        id: `att-mock-1-${i}`,
+        tenant_id: MOCK_TENANT_ID,
+        student_id: "student-1",
+        date: dateStr,
+        status: i === 5 ? "absent" : (i % 2 === 0 ? "boarded" : "dropped"),
+        recorded_by: "driver-1",
+        recorded_at: d.toISOString(),
+    });
+    // student-2
+    MOCK_ATTENDANCE.push({
+        id: `att-mock-2-${i}`,
+        tenant_id: MOCK_TENANT_ID,
+        student_id: "student-2",
+        date: dateStr,
+        status: i === 8 ? "absent" : (i % 3 === 0 ? "boarded" : "dropped"),
+        recorded_by: "driver-1",
+        recorded_at: d.toISOString(),
+    });
+    // student-3
+    MOCK_ATTENDANCE.push({
+        id: `att-mock-3-${i}`,
+        tenant_id: MOCK_TENANT_ID,
+        student_id: "student-3",
+        date: dateStr,
+        status: i === 3 ? "absent" : (i % 2 === 0 ? "dropped" : "boarded"),
+        recorded_by: "driver-2",
+        recorded_at: d.toISOString(),
+    });
+}
+

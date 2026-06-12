@@ -8,20 +8,20 @@ import { router } from "expo-router";
 
 export default function DriverDashboard() {
     const { user, signOut } = useAuth();
-    const { buses, routes, students } = useDatabase();
+    const { buses, routes, students, drivers } = useDatabase();
 
-    // Find this driver's bus via the drivers table
-    // In production, the driver user's auth.uid would be linked via a user_id field on the drivers table
-    // For now, match by driver name or use mock fallback
-    let myBus = buses.find(b => b.driver?.name?.toLowerCase() === user?.name?.toLowerCase());
+    // Resolve driver's bus via user_id (reliable) then fallback to name match
+    const myDriver = drivers.find(d => d.user_id === user?.id) 
+        ?? drivers.find(d => d.name?.toLowerCase() === user?.name?.toLowerCase());
+    let myBus = myDriver ? buses.find(b => b.driver_id === myDriver.id) : undefined;
 
     // Sandbox fallback
-    if (!myBus && (user?.email === "driver@school.com" || user?.name?.toLowerCase() === "driver")) {
+    if (!myBus && (user?.id?.startsWith("mock-") || user?.email === "driver@school.com")) {
         myBus = buses.find(b => b.status === "active");
     }
 
-    const myRoute = myBus ? routes.find(r => r.bus_id === myBus.id) : null;
-    const myStudents = myBus ? students.filter(s => s.bus_id === myBus.id) : [];
+    const myRoute = myBus ? routes.find(r => r.bus_id === myBus!.id) : null;
+    const myStudents = myBus ? students.filter(s => s.bus_id === myBus!.id) : [];
 
     return (
         <View style={styles.container}>
