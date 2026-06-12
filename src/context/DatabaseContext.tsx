@@ -6,13 +6,38 @@ import React, {
     useCallback,
     ReactNode,
 } from "react";
+import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
 import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
-import type { Bus, Route, Student, Payment, Driver, Attendance, AuditLog, ParentStudent, ParentProfile } from "@/src/lib/supabase";
+import type { Bus, Route, Student, Payment, Driver, Attendance, AuditLog, ParentStudent, ParentProfile, AppNotification } from "@/src/lib/supabase";
 import { 
     getDaysRemaining,
     MOCK_BUSES, MOCK_ROUTES, MOCK_STUDENTS, MOCK_PAYMENTS, MOCK_DRIVERS, MOCK_TENANT_ID, MOCK_PARENT_PROFILES, MOCK_ATTENDANCE
 } from "@/src/data/mockData";
 import { useAuth } from "@/src/context/AuthContext";
+
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+    } as any),
+});
+
+async function presentLocalNotification(title: string, body: string, data?: Record<string, any>) {
+    try {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title,
+                body,
+                data: data ?? {},
+            },
+            trigger: null,
+        });
+    } catch (e) {
+        console.log("Failed to schedule local notification:", e);
+    }
+}
 
 type DatabaseContextType = {
     buses: Bus[];
@@ -22,6 +47,11 @@ type DatabaseContextType = {
     drivers: Driver[];
     parentProfiles: ParentProfile[];
     auditLogs: AuditLog[];
+    notifications: AppNotification[];
+    trashStudents: Student[];
+    trashBuses: Bus[];
+    trashRoutes: Route[];
+    trashDrivers: Driver[];
     isLoading: boolean;
     error: string | null;
     refreshData: () => Promise<void>;
@@ -31,16 +61,22 @@ type DatabaseContextType = {
     addBus: (bus: Omit<Bus, "id" | "created_at" | "driver" | "tenant_id">) => Promise<void>;
     updateBus: (id: string, updates: Partial<Bus>) => Promise<void>;
     deleteBus: (id: string) => Promise<void>;
+    softDeleteBus: (id: string) => Promise<void>;
+    restoreBus: (id: string) => Promise<void>;
 
     // Route operations
     addRoute: (route: Omit<Route, "id" | "created_at" | "tenant_id">) => Promise<void>;
     updateRoute: (id: string, updates: Partial<Route>) => Promise<void>;
     deleteRoute: (id: string) => Promise<void>;
+    softDeleteRoute: (id: string) => Promise<void>;
+    restoreRoute: (id: string) => Promise<void>;
 
     // Student operations
     addStudent: (student: Omit<Student, "id" | "created_at" | "route" | "bus" | "days_remaining" | "tenant_id">) => Promise<void>;
     updateStudent: (id: string, updates: Partial<Student>) => Promise<void>;
     deleteStudent: (id: string) => Promise<void>;
+    softDeleteStudent: (id: string) => Promise<void>;
+    restoreStudent: (id: string) => Promise<void>;
 
     // Payment operations
     recordPayment: (payment: Omit<Payment, "id" | "student" | "created_at" | "tenant_id">) => Promise<void>;
@@ -50,6 +86,8 @@ type DatabaseContextType = {
     addDriver: (driver: Omit<Driver, "id" | "created_at" | "tenant_id">) => Promise<void>;
     updateDriver: (id: string, updates: Partial<Driver>) => Promise<void>;
     deleteDriver: (id: string) => Promise<void>;
+    softDeleteDriver: (id: string) => Promise<void>;
+    restoreDriver: (id: string) => Promise<void>;
     generateDriverLogin: (driverId: string, username: string) => Promise<void>;
 
     // Attendance operations
@@ -66,6 +104,11 @@ type DatabaseContextType = {
     unlinkParentFromStudent: (parentId: string, studentId: string) => Promise<void>;
     getParentStudentLinks: (parentUserId: string) => Promise<ParentStudent[]>;
     refreshParents: () => Promise<void>;
+
+    // Notifications operations
+    markNotificationRead: (id: string) => Promise<void>;
+    clearAllNotifications: () => Promise<void>;
+    triggerNotification: (userId: string, title: string, body: string, data?: Record<string, any>) => Promise<void>;
 
     // Audit log operations
     loadAuditLogs: () => Promise<void>;
@@ -98,8 +141,30 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
     const [drivers, setDrivers] = useState<Driver[]>(isSupabaseConfigured ? [] : MOCK_DRIVERS);
     const [parentProfiles, setParentProfiles] = useState<ParentProfile[]>(isSupabaseConfigured ? [] : MOCK_PARENT_PROFILES);
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function registerForPushNotifications() {
+            if (Platform.OS === "web") return;
+            try {
+                const { status: existingStatus } = await Notifications.getPermissionsAsync();
+                let finalStatus = existingStatus;
+                if (existingStatus !== "granted") {
+                    const { status } = await Notifications.requestPermissionsAsync();
+                    finalStatus = status;
+                }
+                if (finalStatus !== "granted") {
+                    console.log("Failed to get push token for push notification!");
+                    return;
+                }
+            } catch (e) {
+                console.log("Error checking push notification permissions:", e);
+            }
+        }
+        registerForPushNotifications();
+    }, []);
 
     // ─── Audit Log Helper ─────────────────────────────────────────────────────
     const writeAuditLog = async (action: string, tableName: string, recordId: string) => {
@@ -186,6 +251,51 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         return (data ?? []) as ParentProfile[];
     };
 
+    const loadNotifications = async (): Promise<AppNotification[]> => {
+        if (!user?.id) return [];
+        const { data, error } = await supabase
+            .from("notifications")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+        if (error) {
+            console.log("notifications load failed:", error.message);
+            return [];
+        }
+        return (data ?? []) as AppNotification[];
+    };
+
+    const checkAndPurgeTrash = useCallback(async (
+        allStudents: Student[],
+        allBuses: Bus[],
+        allRoutes: Route[],
+        allDrivers: Driver[]
+    ) => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const purgeBefore = thirtyDaysAgo.toISOString();
+
+        if (!isSupabaseConfigured) {
+            // Mock purge in state
+            setStudents(prev => prev.filter(s => !s.is_deleted || !s.deleted_at || new Date(s.deleted_at) >= thirtyDaysAgo));
+            setBuses(prev => prev.filter(b => !b.is_deleted || !b.deleted_at || new Date(b.deleted_at) >= thirtyDaysAgo));
+            setRoutes(prev => prev.filter(r => !r.is_deleted || !r.deleted_at || new Date(r.deleted_at) >= thirtyDaysAgo));
+            setDrivers(prev => prev.filter(d => !d.is_deleted || !d.deleted_at || new Date(d.deleted_at) >= thirtyDaysAgo));
+            return;
+        }
+
+        try {
+            await Promise.all([
+                supabase.from("students").delete().eq("is_deleted", true).lt("deleted_at", purgeBefore),
+                supabase.from("buses").delete().eq("is_deleted", true).lt("deleted_at", purgeBefore),
+                supabase.from("routes").delete().eq("is_deleted", true).lt("deleted_at", purgeBefore),
+                supabase.from("drivers").delete().eq("is_deleted", true).lt("deleted_at", purgeBefore),
+            ]);
+        } catch (e) {
+            console.log("Failed to purge trash database records:", e);
+        }
+    }, [isSupabaseConfigured]);
+
     const refreshData = useCallback(async () => {
         if (!isSupabaseConfigured) {
             setIsLoading(false);
@@ -195,11 +305,12 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         setError(null);
         try {
             // Fetch non-dependent datasets in parallel
-            const [driverList, routeList, paymentList, parentList, tenantResult] = await Promise.all([
+            const [driverList, routeList, paymentList, parentList, notificationsList, tenantResult] = await Promise.all([
                 loadDrivers(),
                 loadRoutes(),
                 loadPayments(),
                 loadParentProfiles(),
+                loadNotifications(),
                 user?.tenant_id 
                     ? supabase.from("tenants").select("common_password").eq("id", user.tenant_id).single()
                     : Promise.resolve({ data: null, error: null })
@@ -224,16 +335,20 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             setStudents(studentList);
             setPayments(paymentList);
             setParentProfiles(parentList);
+            setNotifications(notificationsList);
 
             if (tenantResult?.data?.common_password) {
                 setCommonPassword(tenantResult.data.common_password);
             }
+
+            // Run purge check
+            await checkAndPurgeTrash(studentList, busList, routeListWithBus, driverList);
         } catch (e: any) {
             setError(e.message || "Failed to load data");
         } finally {
             setIsLoading(false);
         }
-    }, [isSupabaseConfigured, user?.tenant_id]);
+    }, [isSupabaseConfigured, user?.tenant_id, user?.id, checkAndPurgeTrash]);
 
     useEffect(() => {
         refreshData();
@@ -895,15 +1010,176 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    // ─── Soft Delete Operations ──────────────────────────────────────────────
+    const softDeleteStudent = async (id: string) => {
+        const now = new Date().toISOString();
+        if (!isSupabaseConfigured) {
+            setStudents(prev => prev.map(s => s.id === id ? { ...s, is_deleted: true, deleted_at: now } : s));
+            return;
+        }
+        const { error } = await supabase.from("students").update({ is_deleted: true, deleted_at: now }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Student Soft Deleted", "students", id);
+        await refreshData();
+    };
+
+    const restoreStudent = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setStudents(prev => prev.map(s => s.id === id ? { ...s, is_deleted: false, deleted_at: null } : s));
+            return;
+        }
+        const { error } = await supabase.from("students").update({ is_deleted: false, deleted_at: null }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Student Restored", "students", id);
+        await refreshData();
+    };
+
+    const softDeleteBus = async (id: string) => {
+        const now = new Date().toISOString();
+        if (!isSupabaseConfigured) {
+            setBuses(prev => prev.map(b => b.id === id ? { ...b, is_deleted: true, deleted_at: now } : b));
+            return;
+        }
+        const { error } = await supabase.from("buses").update({ is_deleted: true, deleted_at: now }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Bus Soft Deleted", "buses", id);
+        await refreshData();
+    };
+
+    const restoreBus = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setBuses(prev => prev.map(b => b.id === id ? { ...b, is_deleted: false, deleted_at: null } : b));
+            return;
+        }
+        const { error } = await supabase.from("buses").update({ is_deleted: false, deleted_at: null }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Bus Restored", "buses", id);
+        await refreshData();
+    };
+
+    const softDeleteRoute = async (id: string) => {
+        const now = new Date().toISOString();
+        if (!isSupabaseConfigured) {
+            setRoutes(prev => prev.map(r => r.id === id ? { ...r, is_deleted: true, deleted_at: now } : r));
+            return;
+        }
+        const { error } = await supabase.from("routes").update({ is_deleted: true, deleted_at: now }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Route Soft Deleted", "routes", id);
+        await refreshData();
+    };
+
+    const restoreRoute = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setRoutes(prev => prev.map(r => r.id === id ? { ...r, is_deleted: false, deleted_at: null } : r));
+            return;
+        }
+        const { error } = await supabase.from("routes").update({ is_deleted: false, deleted_at: null }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Route Restored", "routes", id);
+        await refreshData();
+    };
+
+    const softDeleteDriver = async (id: string) => {
+        const now = new Date().toISOString();
+        if (!isSupabaseConfigured) {
+            setDrivers(prev => prev.map(d => d.id === id ? { ...d, is_deleted: true, deleted_at: now } : d));
+            return;
+        }
+        const { error } = await supabase.from("drivers").update({ is_deleted: true, deleted_at: now }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Driver Soft Deleted", "drivers", id);
+        await refreshData();
+    };
+
+    const restoreDriver = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setDrivers(prev => prev.map(d => d.id === id ? { ...d, is_deleted: false, deleted_at: null } : d));
+            return;
+        }
+        const { error } = await supabase.from("drivers").update({ is_deleted: false, deleted_at: null }).eq("id", id);
+        if (error) throw new Error(error.message);
+        await writeAuditLog("Driver Restored", "drivers", id);
+        await refreshData();
+    };
+
+    // ─── Notification Operations ─────────────────────────────────────────────
+    const markNotificationRead = async (id: string) => {
+        if (!isSupabaseConfigured) {
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" as const } : n));
+            return;
+        }
+        const { error } = await supabase.from("notifications").update({ status: "read" }).eq("id", id);
+        if (error) throw new Error(error.message);
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, status: "read" as const } : n));
+    };
+
+    const clearAllNotifications = async () => {
+        if (!user?.id) return;
+        if (!isSupabaseConfigured) {
+            setNotifications([]);
+            return;
+        }
+        const { error } = await supabase.from("notifications").delete().eq("user_id", user.id);
+        if (error) throw new Error(error.message);
+        setNotifications([]);
+    };
+
+    const triggerNotification = async (userId: string, title: string, body: string, data?: Record<string, any>) => {
+        const targetTenant = user?.tenant_id || MOCK_TENANT_ID;
+        if (!isSupabaseConfigured) {
+            const mockNotif: AppNotification = {
+                id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                tenant_id: targetTenant,
+                user_id: userId,
+                title,
+                body,
+                status: "unread",
+                data,
+                created_at: new Date().toISOString()
+            };
+            if (userId === user?.id) {
+                setNotifications(prev => [mockNotif, ...prev]);
+            }
+            await presentLocalNotification(title, body, data);
+            return;
+        }
+        const { data: inserted, error } = await supabase
+            .from("notifications")
+            .insert([{
+                tenant_id: targetTenant,
+                user_id: userId,
+                title,
+                body,
+                status: "unread",
+                data: data ?? {}
+            }])
+            .select()
+            .single();
+        if (error) {
+            console.log("Failed to insert DB notification:", error.message);
+            return;
+        }
+        if (userId === user?.id && inserted) {
+            setNotifications(prev => [inserted as AppNotification, ...prev]);
+        }
+        await presentLocalNotification(title, body, data);
+    };
+
     return (
         <DatabaseContext.Provider value={{
-            buses,
-            routes,
-            students,
+            buses: buses.filter(b => !b.is_deleted),
+            routes: routes.filter(r => !r.is_deleted),
+            students: students.filter(s => !s.is_deleted),
             payments,
-            drivers,
+            drivers: drivers.filter(d => !d.is_deleted),
             parentProfiles,
             auditLogs,
+            notifications,
+            trashStudents: students.filter(s => !!s.is_deleted),
+            trashBuses: buses.filter(b => !!b.is_deleted),
+            trashRoutes: routes.filter(r => !!r.is_deleted),
+            trashDrivers: drivers.filter(d => !!d.is_deleted),
             isLoading,
             error,
             refreshData,
@@ -911,17 +1187,25 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             addBus,
             updateBus,
             deleteBus,
+            softDeleteBus,
+            restoreBus,
             addRoute,
             updateRoute,
             deleteRoute,
+            softDeleteRoute,
+            restoreRoute,
             addStudent,
             updateStudent,
             deleteStudent,
+            softDeleteStudent,
+            restoreStudent,
             recordPayment,
             getStudentPayments,
             addDriver,
             updateDriver,
             deleteDriver,
+            softDeleteDriver,
+            restoreDriver,
             generateDriverLogin,
             markAttendance,
             getAttendanceByDate,
@@ -935,6 +1219,9 @@ export const DatabaseProvider = ({ children }: { children: ReactNode }) => {
             getParentStudentLinks,
             refreshParents,
             loadAuditLogs,
+            markNotificationRead,
+            clearAllNotifications,
+            triggerNotification,
             commonPassword,
             updateCommonPassword,
         }}>

@@ -22,6 +22,8 @@ import { useDatabase } from "@/src/context/DatabaseContext";
 import { blurActiveElement, runAfterBlur, webNonFocusableProps } from "@/src/utils/webFocus";
 import { LineChart, PieChart } from "react-native-chart-kit";
 import OnboardingOverlay from "@/src/components/OnboardingOverlay";
+import GlobalSearch from "@/src/components/GlobalSearch";
+import NotificationPanel from "@/src/components/NotificationPanel";
 
 const { width } = Dimensions.get("window");
 const CARD_W = (width - 20 * 2 - 12) / 2;
@@ -130,11 +132,15 @@ function ActionGridItem({
 
 export default function AdminDashboard() {
     const { user, signOut, hasSeenOnboarding, setOnboardingComplete } = useAuth();
-    const { buses, routes, students, refreshData, fetchRevenueStats } = useDatabase();
+    const { buses, routes, students, refreshData, fetchRevenueStats, notifications } = useDatabase();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [revenueData, setRevenueData] = useState<{ month: string; revenue: number }[]>([]);
+    const [showSearch, setShowSearch] = useState(false);
+    const [showNotif, setShowNotif] = useState(false);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
+
+    const unreadCount = useMemo(() => notifications.filter(n => n.status === "unread").length, [notifications]);
 
     React.useEffect(() => {
         Animated.parallel([
@@ -245,9 +251,22 @@ export default function AdminDashboard() {
                                 <Text style={styles.userName}>{user?.name ?? "Admin"}</Text>
                             </View>
                         </View>
-                        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-                            <Ionicons name="log-out-outline" size={20} color="#FF1744" />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <TouchableOpacity onPress={() => setShowSearch(true)} style={styles.headerBtn} activeOpacity={0.8}>
+                                <Ionicons name="search-outline" size={20} color="#FFF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setShowNotif(true)} style={styles.headerBtn} activeOpacity={0.8}>
+                                <Ionicons name="notifications-outline" size={20} color="#FFF" />
+                                {unreadCount > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>{unreadCount}</Text>
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn} activeOpacity={0.8}>
+                                <Ionicons name="log-out-outline" size={20} color="#FF1744" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     {/* Overdue alert */}
@@ -285,9 +304,9 @@ export default function AdminDashboard() {
                             accent="#FFB800"
                         />
                         <ActionGridItem
-                            icon="add-circle"
-                            title="Add Bus"
-                            onPress={() => router.push("/(admin)/add-bus")}
+                            icon="analytics"
+                            title="Analytics"
+                            onPress={() => router.push("/(admin)/analytics")}
                             accent="#FF8C00"
                         />
                         <ActionGridItem
@@ -315,9 +334,9 @@ export default function AdminDashboard() {
                             accent="#00BCD4"
                         />
                         <ActionGridItem
-                            icon="add-circle"
-                            title="Add Route"
-                            onPress={() => router.push("/(admin)/add-route")}
+                            icon="trash"
+                            title="Trash"
+                            onPress={() => router.push("/(admin)/trash")}
                             accent="#E91E63"
                         />
                         <ActionGridItem
@@ -440,6 +459,10 @@ export default function AdminDashboard() {
                 </Animated.View>
             </ScrollView>
 
+            {/* Global Search and Notifications Overlays */}
+            <GlobalSearch visible={showSearch} onClose={() => setShowSearch(false)} />
+            <NotificationPanel visible={showNotif} onClose={() => setShowNotif(false)} />
+
             {/* First-login onboarding tutorial */}
             <OnboardingOverlay
                 role="admin"
@@ -477,6 +500,32 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(255,23,68,0.1)",
         alignItems: "center",
         justifyContent: "center",
+    },
+    headerBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+    },
+    badge: {
+        position: "absolute",
+        top: -4,
+        right: -4,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: "#FF1744",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 4,
+    },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: "900",
+        color: "#FFF",
     },
 
     alertBanner: {

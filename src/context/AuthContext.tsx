@@ -32,6 +32,7 @@ type AuthContextType = {
     isLoading: boolean;
     hasSeenOnboarding: boolean;
     setOnboardingComplete: () => Promise<void>;
+    resetOnboarding: () => Promise<void>;
     signInMockUser?: (role: AppRole, phoneOrEmail: string, name?: string, needsPasswordChange?: boolean) => void;
 };
 
@@ -103,6 +104,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (err) {
             console.log("Error saving onboarding state:", err);
             setHasSeenOnboarding(true);
+        }
+    }, [user?.id]);
+
+    const resetOnboarding = useCallback(async () => {
+        if (!user?.id) return;
+        try {
+            await AsyncStorage.setItem(`onboarding_seen_${user.id}`, "false");
+            setHasSeenOnboarding(false);
+        } catch (err) {
+            console.log("Error resetting onboarding state:", err);
         }
     }, [user?.id]);
 
@@ -231,7 +242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, updateProfile, updatePassword, signOut, isLoading, hasSeenOnboarding, setOnboardingComplete, signInMockUser }}>
+        <AuthContext.Provider value={{ user, session, updateProfile, updatePassword, signOut, isLoading, hasSeenOnboarding, setOnboardingComplete, resetOnboarding, signInMockUser }}>
             {children}
         </AuthContext.Provider>
     );

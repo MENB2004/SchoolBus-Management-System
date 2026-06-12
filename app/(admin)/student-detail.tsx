@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Alert, RefreshControl, Modal, TextInput,
@@ -9,24 +9,60 @@ import { Ionicons } from "@expo/vector-icons";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { router, useLocalSearchParams } from "expo-router";
 import { getFeeStatus, FEE_COLORS, formatDueDate, getCurrentMonthLabel, Payment } from "@/src/data/mockData";
+import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
 
 function PaymentModal({
     visible,
     studentName,
     monthlyFee,
+    feePaidUntil,
     onClose,
     onRecord,
 }: {
     visible: boolean;
     studentName: string;
     monthlyFee: number;
+    feePaidUntil: string | null;
     onClose: () => void;
-    onRecord: (amount: number, mode: string, notes: string) => Promise<void>;
+    onRecord: (amount: number, mode: string, notes: string, months: string[]) => Promise<void>;
 }) {
+    // Generate next 6 months options starting from feePaidUntil
+    const monthOptions = useMemo(() => {
+        const list: string[] = [];
+        let start = new Date();
+        if (feePaidUntil) {
+            const parsed = new Date(feePaidUntil);
+            if (!isNaN(parsed.getTime())) {
+                start = new Date(parsed.getFullYear(), parsed.getMonth() + 1, 1);
+            }
+        }
+        for (let i = 0; i < 6; i++) {
+            const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+            list.push(d.toLocaleDateString("en-IN", { month: "long", year: "numeric" }));
+        }
+        return list;
+    }, [feePaidUntil]);
+
     const [amount, setAmount] = useState(String(monthlyFee));
     const [mode, setMode] = useState<"Cash" | "UPI" | "Bank">("Cash");
     const [notes, setNotes] = useState("");
+    const [selectedMonths, setSelectedMonths] = useState<string[]>([monthOptions[0]]);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        setAmount(String(monthlyFee * selectedMonths.length));
+    }, [selectedMonths, monthlyFee]);
+
+    const toggleMonth = (m: string) => {
+        setSelectedMonths(prev => {
+            if (prev.includes(m)) {
+                if (prev.length === 1) return prev; // keep at least one
+                return prev.filter(x => x !== m);
+            } else {
+                return [...prev, m];
+            }
+        });
+    };
 
     const handleRecord = async () => {
         const amt = parseFloat(amount);
@@ -34,9 +70,13 @@ function PaymentModal({
             Alert.alert("Invalid Amount", "Please enter a valid payment amount.");
             return;
         }
+        if (selectedMonths.length === 0) {
+            Alert.alert("Selection Required", "Please select at least one month.");
+            return;
+        }
         setLoading(true);
         try {
-            await onRecord(amt, mode, notes);
+            await onRecord(amt, mode, notes, selectedMonths);
             onClose();
         } catch (e: any) {
             Alert.alert("Error", e.message);
@@ -53,6 +93,24 @@ function PaymentModal({
                         <View style={modal.handle} />
                         <Text style={modal.title}>Record Payment</Text>
                         <Text style={modal.sub}>{studentName}</Text>
+
+                        <Text style={modal.label}>SELECT MONTHS</Text>
+                        <View style={styles.monthSelectGrid}>
+                            {monthOptions.map(m => {
+                                const active = selectedMonths.includes(m);
+                                return (
+                                    <TouchableOpacity
+                                        key={m}
+                                        style={[styles.monthChipBtn, active && styles.monthChipBtnActive]}
+                                        onPress={() => toggleMonth(m)}
+                                    >
+                                        <Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>
+                                            {m.split(" ")[0].substring(0, 3)} {m.split(" ")[1]}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
 
                         <Text style={modal.label}>AMOUNT (₹)</Text>
                         <View style={modal.inputWrap}>
@@ -86,7 +144,7 @@ function PaymentModal({
                                 style={[modal.input, { paddingVertical: 8 }]}
                                 value={notes}
                                 onChangeText={setNotes}
-                                placeholder="e.g. June 2026 fee"
+                                placeholder="e.g. Paid by father"
                                 placeholderTextColor="#333"
                                 multiline
                             />
@@ -117,7 +175,15 @@ function PaymentModal({
 
 export default function StudentDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { students, deleteStudent, refreshData, recordPayment, getStudentPayments, updateStudent } = useDatabase();
+    const {
+        students,
+        softDeleteStudent,
+        refreshData,
+        recordPayment,
+        getStudentPayments,
+        updateStudent,
+        triggerNotification
+    } = useDatabase();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
     const [showPayModal, setShowPayModal] = useState(false);
@@ -140,40 +206,77 @@ export default function StudentDetailScreen() {
         setIsRefreshing(false);
     }, [refreshData, id]);
 
-    const handleRecordPayment = async (amount: number, mode: string, notes: string) => {
+    const handleRecordPayment = async (amount: number, mode: string, notes: string, selectedMonthsList: string[]) => {
         if (!student) return;
         const now = new Date();
-        const nextMonth = new Date(now);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        const amountPerMonth = amount / selectedMonthsList.length;
 
-        await recordPayment({
-            student_id: student.id,
-            amount,
-            paid_at: now.toISOString(),
-            month: getCurrentMonthLabel(),
-            payment_mode: mode,
-            notes: notes || null,
-        });
+        // Loop to insert payment for each month
+        for (const m of selectedMonthsList) {
+            await recordPayment({
+                student_id: student.id,
+                amount: amountPerMonth,
+                paid_at: now.toISOString(),
+                month: m,
+                payment_mode: mode,
+                notes: notes ? `${notes} (Part of multi-month)` : "Multi-month payment",
+            });
+        }
 
-        // Update fee_paid_until to next month
+        // Extend fee_paid_until date by number of selected months
+        const paidUntil = student.fee_paid_until ? new Date(student.fee_paid_until) : new Date();
+        paidUntil.setMonth(paidUntil.getMonth() + selectedMonthsList.length);
+        const lastDay = new Date(paidUntil.getFullYear(), paidUntil.getMonth() + 1, 0);
+
         await updateStudent(student.id, {
-            fee_paid_until: nextMonth.toISOString().split("T")[0],
+            fee_paid_until: lastDay.toISOString().split("T")[0],
         });
+
+        // Trigger Parent notifications about payment
+        try {
+            if (isSupabaseConfigured) {
+                const { data: parentLinks } = await supabase
+                    .from("parent_students")
+                    .select("parent_id")
+                    .eq("student_id", student.id);
+                if (parentLinks) {
+                    for (const link of parentLinks) {
+                        await triggerNotification(
+                            link.parent_id,
+                            "Fee Payment Recorded",
+                            `A payment of ₹${amount} for ${student.name} (${selectedMonthsList.join(", ")}) has been recorded.`,
+                            { studentId: student.id }
+                        );
+                    }
+                }
+            } else {
+                // Mock parent alert
+                await triggerNotification(
+                    "mock-parent-id",
+                    "Fee Payment Recorded",
+                    `A payment of ₹${amount} for ${student.name} (${selectedMonthsList.join(", ")}) has been recorded.`,
+                    { studentId: student.id }
+                );
+            }
+        } catch (e) {
+            console.log("Failed to trigger parent payment notifications:", e);
+        }
+
         setShowPayModal(false);
     };
 
     const handleDelete = () => {
         Alert.alert(
-            "Remove Student",
-            `Remove ${student?.name} from the system?`,
+            "Move to Trash",
+            `Move ${student?.name} to Trash? You can recover this student from the Trash console within 30 days.`,
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Remove",
+                    text: "Move to Trash",
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            await deleteStudent(id!);
+                            await softDeleteStudent(id!);
                             router.back();
                         } catch (e: any) {
                             Alert.alert("Error", e.message);
@@ -315,6 +418,7 @@ export default function StudentDetailScreen() {
                 visible={showPayModal}
                 studentName={student.name}
                 monthlyFee={student.monthly_fee}
+                feePaidUntil={student.fee_paid_until}
                 onClose={() => setShowPayModal(false)}
                 onRecord={handleRecordPayment}
             />
@@ -385,6 +489,11 @@ const styles = StyleSheet.create({
     emptyText: { fontSize: 13, color: "#444", fontWeight: "600", paddingVertical: 12 },
     deleteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 16, borderRadius: 16, backgroundColor: "rgba(255,23,68,0.1)", borderWidth: 1, borderColor: "rgba(255,23,68,0.2)", marginTop: 10 },
     deleteBtnText: { fontSize: 14, fontWeight: "700", color: "#FF1744" },
+    monthSelectGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 8 },
+    monthChipBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+    monthChipBtnActive: { backgroundColor: "rgba(0,230,118,0.15)", borderColor: "rgba(0,230,118,0.4)" },
+    monthChipText: { fontSize: 12, color: "#888", fontWeight: "600" },
+    monthChipTextActive: { color: "#00E676", fontWeight: "800" },
 });
 
 const modal = StyleSheet.create({

@@ -47,7 +47,7 @@ function SettingRow({
 }
 
 export default function SettingsScreen() {
-    const { user, signOut, updateProfile, setOnboardingComplete } = useAuth();
+    const { user, signOut, updateProfile, setOnboardingComplete, resetOnboarding, updatePassword } = useAuth();
     const { buses, routes, students, updateRoute, commonPassword, updateCommonPassword } = useDatabase();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [showTutorial, setShowTutorial] = useState(false);
@@ -90,6 +90,8 @@ export default function SettingsScreen() {
     const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
     const [newCommonPassword, setNewCommonPassword] = useState(commonPassword || "school123");
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [adminNewPassword, setAdminNewPassword] = useState("");
+    const [isUpdatingAdminPassword, setIsUpdatingAdminPassword] = useState(false);
 
     React.useEffect(() => {
         if (commonPassword) {
@@ -558,6 +560,56 @@ export default function SettingsScreen() {
                                     <Text style={[styles.pricingBtnText, { color: "#FF1744" }]}>UPDATE COMMON PASSWORD</Text>
                                 )}
                             </TouchableOpacity>
+
+                            <View style={{ height: 1, backgroundColor: "rgba(255,255,255,0.06)", marginVertical: 8 }} />
+
+                            <Text style={styles.pricingSublabel}>CHANGE MY ADMIN PASSWORD</Text>
+                            <View style={styles.pricingInputWrap}>
+                                <Ionicons name="lock-closed-outline" size={15} color="#FF1744" style={{ marginRight: 8 }} />
+                                <TextInput
+                                    style={styles.pricingInput}
+                                    placeholder="Enter secure new password"
+                                    placeholderTextColor="#333"
+                                    value={adminNewPassword}
+                                    onChangeText={setAdminNewPassword}
+                                    secureTextEntry
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                            <TouchableOpacity
+                                style={[styles.pricingBtn, { width: "100%", backgroundColor: "rgba(255,23,68,0.15)", borderColor: "rgba(255,23,68,0.3)", height: 44 }]}
+                                onPress={async () => {
+                                    const lengthVal = adminNewPassword.length >= 8;
+                                    const upperVal = /[A-Z]/.test(adminNewPassword);
+                                    const lowerVal = /[a-z]/.test(adminNewPassword);
+                                    const symbolVal = /[\d\W]/.test(adminNewPassword);
+                                    
+                                    if (!lengthVal || !upperVal || !lowerVal || !symbolVal) {
+                                        Alert.alert(
+                                            "Weak Password",
+                                            "Password must be at least 8 characters and include uppercase, lowercase, and a number or symbol."
+                                        );
+                                        return;
+                                    }
+                                    setIsUpdatingAdminPassword(true);
+                                    try {
+                                        await updatePassword(adminNewPassword);
+                                        Alert.alert("Success", "Your password has been changed successfully!");
+                                        setAdminNewPassword("");
+                                    } catch (e: any) {
+                                        Alert.alert("Error", e.message || "Failed to update password.");
+                                    } finally {
+                                        setIsUpdatingAdminPassword(false);
+                                    }
+                                }}
+                                disabled={isUpdatingAdminPassword}
+                            >
+                                {isUpdatingAdminPassword ? (
+                                    <ActivityIndicator color="#FF1744" />
+                                ) : (
+                                    <Text style={[styles.pricingBtnText, { color: "#FF1744" }]}>CHANGE MY PASSWORD</Text>
+                                )}
+                            </TouchableOpacity>
                         </View>
                     )}
                 </View>
@@ -629,9 +681,7 @@ export default function SettingsScreen() {
                         title="Replay App Tutorial"
                         subtitle="Re-watch the feature walkthrough"
                         onPress={async () => {
-                            if (user?.id) {
-                                await AsyncStorage.removeItem(`onboarding_seen_${user.id}`);
-                            }
+                            await resetOnboarding();
                             setShowTutorial(true);
                         }}
                         accent="#7C3AED"

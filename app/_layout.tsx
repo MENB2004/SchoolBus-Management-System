@@ -5,6 +5,7 @@ import { DatabaseProvider } from "@/src/context/DatabaseContext";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ActivityIndicator, StyleSheet, LogBox, Platform, View, Alert } from "react-native";
 import * as Updates from "expo-updates";
+import ErrorBoundary from "@/src/components/ErrorBoundary";
 
 if (Platform.OS === "web") {
     LogBox.ignoreLogs(["props.pointerEvents is deprecated"]);
@@ -125,15 +126,17 @@ export default function RootLayout() {
     }, []);
 
     return (
-        <GestureHandlerRootView style={styles.root}>
-            <AuthProvider>
-                <DatabaseProvider>
-                    <RouteGuard>
-                        <Stack screenOptions={{ headerShown: false }} />
-                    </RouteGuard>
-                </DatabaseProvider>
-            </AuthProvider>
-        </GestureHandlerRootView>
+        <ErrorBoundary>
+            <GestureHandlerRootView style={styles.root}>
+                <AuthProvider>
+                    <DatabaseProvider>
+                        <RouteGuard>
+                            <Stack screenOptions={{ headerShown: false }} />
+                        </RouteGuard>
+                    </DatabaseProvider>
+                </AuthProvider>
+            </GestureHandlerRootView>
+        </ErrorBoundary>
     );
 }
 

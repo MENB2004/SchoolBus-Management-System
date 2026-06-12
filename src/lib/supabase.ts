@@ -78,6 +78,8 @@ export type Driver = {
     name: string;
     phone: string;
     username?: string;
+    is_deleted?: boolean;
+    deleted_at?: string | null;
     created_at: string;
 };
 
@@ -88,6 +90,8 @@ export type Bus = {
     capacity: number;
     driver_id: string | null;
     status: "active" | "inactive";
+    is_deleted?: boolean;
+    deleted_at?: string | null;
     created_at: string;
     // Joined fields (not in DB, populated by queries)
     driver?: Driver;
@@ -103,6 +107,8 @@ export type Route = {
     stops: string[];
     stop_fees?: number[];
     monthly_fee: number;
+    is_deleted?: boolean;
+    deleted_at?: string | null;
     created_at: string;
     // Joined fields
     bus?: Bus;
@@ -120,6 +126,8 @@ export type Student = {
     monthly_fee: number;
     fee_paid_until: string | null;
     is_active: boolean;
+    is_deleted?: boolean;
+    deleted_at?: string | null;
     created_at: string;
     // Joined fields
     route?: Route;
@@ -155,10 +163,22 @@ export type Attendance = {
     student_id: string;
     date: string;
     status: "boarded" | "dropped" | "absent";
+    notes?: string | null;
     recorded_by: string;
     recorded_at: string;
     // Joined fields
     student?: Student;
+};
+
+export type AppNotification = {
+    id: string;
+    tenant_id: string;
+    user_id: string;
+    title: string;
+    body: string;
+    status: "unread" | "read";
+    data?: Record<string, any>;
+    created_at: string;
 };
 
 export type AuditLog = {
@@ -198,6 +218,7 @@ export type Database = {
             payments: { Row: Omit<Payment, "student" | "created_at"> & { created_at: string } };
             attendance: { Row: Omit<Attendance, "student"> };
             audit_logs: { Row: AuditLog };
+            notifications: { Row: AppNotification };
         };
     };
 };

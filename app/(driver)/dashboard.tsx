@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,10 +6,16 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { router } from "expo-router";
 import OnboardingOverlay from "@/src/components/OnboardingOverlay";
+import GlobalSearch from "@/src/components/GlobalSearch";
+import NotificationPanel from "@/src/components/NotificationPanel";
 
 export default function DriverDashboard() {
     const { user, signOut, hasSeenOnboarding, setOnboardingComplete } = useAuth();
-    const { buses, routes, students, drivers } = useDatabase();
+    const { buses, routes, students, drivers, notifications } = useDatabase();
+    const [showSearch, setShowSearch] = useState(false);
+    const [showNotif, setShowNotif] = useState(false);
+
+    const unreadCount = React.useMemo(() => notifications.filter(n => n.status === "unread").length, [notifications]);
 
     // Resolve driver's bus via user_id (reliable) then fallback to name match
     const myDriver = drivers.find(d => d.user_id === user?.id) 
@@ -34,9 +40,22 @@ export default function DriverDashboard() {
                         <Text style={styles.greeting}>MY DASHBOARD</Text>
                         <Text style={styles.userName}>{user?.name ?? "Driver"}</Text>
                     </View>
-                    <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
-                        <Ionicons name="log-out-outline" size={20} color="#FF1744" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <TouchableOpacity onPress={() => setShowSearch(true)} style={styles.headerBtn} activeOpacity={0.8}>
+                            <Ionicons name="search-outline" size={20} color="#FFF" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowNotif(true)} style={styles.headerBtn} activeOpacity={0.8}>
+                            <Ionicons name="notifications-outline" size={20} color="#FFF" />
+                            {unreadCount > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>{unreadCount}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.logoutBtn} onPress={signOut} activeOpacity={0.8}>
+                            <Ionicons name="log-out-outline" size={20} color="#FF1744" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {myBus ? (
@@ -52,21 +71,34 @@ export default function DriverDashboard() {
                             </View>
                         </View>
 
-                        {/* Mark Attendance Button */}
-                        <TouchableOpacity 
-                            onPress={() => router.push("/(driver)/attendance")} 
-                            activeOpacity={0.88}
-                            style={{ marginBottom: 24 }}
-                        >
-                            <LinearGradient 
-                                colors={["#FFB800", "#FF8C00"]} 
-                                style={styles.markBtn}
-                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                        {/* Attendance Actions */}
+                        <View style={{ flexDirection: "row", gap: 12, marginBottom: 24 }}>
+                            <TouchableOpacity 
+                                onPress={() => router.push("/(driver)/attendance")} 
+                                activeOpacity={0.88}
+                                style={{ flex: 1 }}
                             >
-                                <Ionicons name="calendar-outline" size={18} color="#0A0A0F" />
-                                <Text style={styles.markBtnText}>MARK TODAY'S ATTENDANCE</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
+                                <LinearGradient 
+                                    colors={["#FFB800", "#FF8C00"]} 
+                                    style={styles.markBtn}
+                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                                >
+                                    <Ionicons name="calendar-outline" size={18} color="#0A0A0F" />
+                                    <Text style={styles.markBtnText}>MARK TODAY</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                onPress={() => router.push("/(driver)/attendance-history")} 
+                                activeOpacity={0.88}
+                                style={{ flex: 1 }}
+                            >
+                                <View style={styles.historyBtn}>
+                                    <Ionicons name="time-outline" size={18} color="#FFB800" />
+                                    <Text style={styles.historyBtnText}>HISTORY LOGS</Text>
+                                </View>
+                            </TouchableOpacity>
+                        </View>
 
                         <Text style={styles.sectionTitle}>MY STUDENTS ({myStudents.length})</Text>
                         {myStudents.map(s => (
@@ -92,6 +124,10 @@ export default function DriverDashboard() {
                 <View style={{ height: 40 }} />
             </ScrollView>
 
+            {/* Global Search and Notifications Overlays */}
+            <GlobalSearch visible={showSearch} onClose={() => setShowSearch(false)} />
+            <NotificationPanel visible={showNotif} onClose={() => setShowNotif(false)} />
+
             {/* First-login onboarding tutorial */}
             <OnboardingOverlay
                 role="driver"
@@ -109,6 +145,32 @@ const styles = StyleSheet.create({
     greeting: { fontSize: 10, fontWeight: "800", color: "#FFB800", letterSpacing: 2, marginBottom: 4 },
     userName: { fontSize: 24, fontWeight: "900", color: "#FFFFFF" },
     logoutBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,23,68,0.1)", alignItems: "center", justifyContent: "center" },
+    headerBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+    },
+    badge: {
+        position: "absolute",
+        top: -4,
+        right: -4,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: "#FF1744",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 4,
+    },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: "900",
+        color: "#FFF",
+    },
     busCard: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 20, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: "rgba(255,184,0,0.15)" },
     busIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center" },
     busNumber: { fontSize: 20, fontWeight: "900", color: "#FFFFFF" },
@@ -132,4 +194,21 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     markBtnText: { fontSize: 13, fontWeight: "900", color: "#0A0A0F", letterSpacing: 1 },
+    historyBtn: {
+        height: 52,
+        borderRadius: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        backgroundColor: "rgba(255,184,0,0.05)",
+        borderWidth: 1,
+        borderColor: "rgba(255,184,0,0.2)",
+    },
+    historyBtnText: {
+        fontSize: 13,
+        fontWeight: "900",
+        color: "#FFB800",
+        letterSpacing: 1,
+    },
 });

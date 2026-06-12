@@ -28,15 +28,30 @@ export const ADMIN_STEPS: OnboardingStep[] = [
         icon: "grid",
         title: "Your Command Center",
         description:
-            "The Dashboard gives you an instant overview — total buses, routes, students, fee collection status, revenue trends, and quick action shortcuts to every feature.",
+            "The Dashboard gives you an instant overview — total buses, routes, students, fee collection status, and quick action shortcuts to every feature.",
         screenId: "dashboard",
         accent: ["#FFB800", "#FF8C00"],
+    },
+    {
+        icon: "bar-chart",
+        title: "Advanced Analytics",
+        description:
+            "Examine weekly attendance patterns, passenger capacity ratios, and cash vs. online revenue splits using dynamic visual charts. Export PDF summaries on-the-fly.",
+        screenId: "analytics",
+        accent: ["#7C3AED", "#9F67FF"],
+    },
+    {
+        icon: "search",
+        title: "Fuzzy Global Search",
+        description:
+            "Need to find something fast? Tap the search icon at the top of any screen to perform fuzzy searches across routes, student details, buses, or drivers and jump directly there.",
+        accent: ["#00BCD4", "#00E5FF"],
     },
     {
         icon: "bus",
         title: "Manage Your Buses",
         description:
-            "Add your school buses with vehicle numbers, capacity, and status. Each bus can be assigned a driver and linked to a route. Start here to set up your fleet.",
+            "Add your school buses, assign drivers, and manage status. Soft-deleted fleet items can be fully restored from the recovery console.",
         screenId: "buses",
         accent: ["#FF8C00", "#E65100"],
     },
@@ -44,41 +59,32 @@ export const ADMIN_STEPS: OnboardingStep[] = [
         icon: "map",
         title: "Create Routes & Stops",
         description:
-            "Define routes with names, stops, and timings. Assign a bus to each route. Students will be linked to routes based on their boarding stops.",
+            "Define routes with stops, monthly pricing, and timings. Assign a bus to each route. Students will be linked to routes based on their boarding stops.",
         screenId: "routes",
         accent: ["#1E3A5F", "#2E5A9F"],
-    },
-    {
-        icon: "car",
-        title: "Register Drivers",
-        description:
-            "Add drivers with their phone numbers. They'll receive login credentials and can mark daily attendance for students on their assigned bus.",
-        screenId: "drivers",
-        accent: ["#FF8C00", "#FFB800"],
     },
     {
         icon: "people",
         title: "Enroll Students",
         description:
-            "Add students with class, section, bus, route, and boarding stop. Set their monthly fee and track payment status. You can also link parents to students.",
+            "Enroll students and link parents. Supports multi-month payment allocations using simple checkboxes to extend due dates correctly.",
         screenId: "students",
         accent: ["#00C853", "#00E676"],
     },
     {
-        icon: "people-circle",
-        title: "Manage Parents",
+        icon: "trash-bin",
+        title: "30-Day Trash Recovery",
         description:
-            "Parents get their own portal to track attendance, fees, and transport details. Add parents and link them to their children's profiles.",
-        screenId: "parents",
-        accent: ["#00BCD4", "#00E5FF"],
+            "Accidental deletion? Soft-deleted students, buses, routes, and drivers go to the System Trash where you can recover them within 30 days before auto-purging.",
+        screenId: "trash",
+        accent: ["#FF1744", "#FF5252"],
     },
     {
-        icon: "calendar",
-        title: "Attendance & Payments",
+        icon: "notifications",
+        title: "System Alerts Center",
         description:
-            "Monitor daily attendance logs marked by drivers. Track monthly fee payments — see who's paid, who's due, and who's overdue at a glance.",
-        screenId: "attendance",
-        accent: ["#7C3AED", "#9F67FF"],
+            "Tap the bell icon in the header to view chronological alert histories, including planned student absence reports and fee logs.",
+        accent: ["#CE93D8", "#9C27B0"],
     },
     {
         icon: "menu",
@@ -97,7 +103,7 @@ export const DRIVER_STEPS: OnboardingStep[] = [
         icon: "rocket",
         title: "Welcome, Driver!",
         description:
-            "Let's quickly show you around your driver console. You'll see your assigned bus, students, and how to mark daily attendance.",
+            "Let's quickly show you around your driver console. You'll see your assigned bus, students, and how to manage attendance.",
         accent: ["#FFB800", "#FF8C00"],
     },
     {
@@ -110,11 +116,25 @@ export const DRIVER_STEPS: OnboardingStep[] = [
     },
     {
         icon: "calendar",
-        title: "Mark Attendance",
+        title: "Smart Daily Attendance",
         description:
-            "Every day, open the attendance screen to mark each student as Boarded, Dropped, or Absent. Parents get notified of their child's status in real-time.",
+            "Search students by name, filter by specific boarding stops, see a visual progress gauge, and use bulk actions to mark entire stops as Boarded/Dropped. Haptics confirm selections.",
         screenId: "attendance",
         accent: ["#00C853", "#00E676"],
+    },
+    {
+        icon: "time",
+        title: "14-Day History Logs",
+        description:
+            "Forgot to mark someone or made a mistake yesterday? Slide the date strip to view and correct attendance logs for the last 14 days.",
+        accent: ["#00BCD4", "#00E5FF"],
+    },
+    {
+        icon: "search",
+        title: "Quick Search",
+        description:
+            "Tap the search icon in your dashboard header to perform fuzzy searches across your assigned students and locate their details instantly.",
+        accent: ["#7C3AED", "#9F67FF"],
     },
     {
         icon: "menu",
@@ -145,11 +165,18 @@ export const PARENT_STEPS: OnboardingStep[] = [
     },
     {
         icon: "bus",
-        title: "Daily Attendance",
+        title: "Daily Attendance Tracker",
         description:
             "Check if your child has boarded the bus, been dropped off, or is marked absent today. Attendance is updated by the driver in real-time.",
         screenId: "attendance",
         accent: ["#00BCD4", "#00E5FF"],
+    },
+    {
+        icon: "calendar-sharp",
+        title: "Schedule Planned Absence",
+        description:
+            "Mark upcoming student absences in advance for tomorrow, day after, or custom dates. This pre-fills the driver's attendance list and alerts admins automatically.",
+        accent: ["#FF1744", "#FF5252"],
     },
     {
         icon: "cash",

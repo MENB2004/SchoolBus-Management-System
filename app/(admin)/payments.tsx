@@ -174,7 +174,13 @@ export default function PaymentsScreen() {
                 {/* Recent Payments */}
                 {payments.length > 0 && (
                     <>
-                        <Text style={styles.sectionTitle}>RECENT PAYMENTS</Text>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>RECENT PAYMENTS</Text>
+                            <TouchableOpacity onPress={() => router.push("/(admin)/payment-history")} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Ionicons name="time-outline" size={14} color="#7C3AED" />
+                                <Text style={{ fontSize: 12, fontWeight: "700", color: "#7C3AED" }}>View Timeline</Text>
+                            </TouchableOpacity>
+                        </View>
                         <View style={styles.recentCard}>
                             {payments.slice(0, 10).map((p, idx) => {
                                 const s = students.find(st => st.id === p.student_id);

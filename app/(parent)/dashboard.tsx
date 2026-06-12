@@ -10,10 +10,16 @@ import { useDatabase } from "@/src/context/DatabaseContext";
 import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
 import { getFeeStatus, FEE_COLORS, formatDueDate } from "@/src/data/mockData";
 import OnboardingOverlay from "@/src/components/OnboardingOverlay";
+import GlobalSearch from "@/src/components/GlobalSearch";
+import NotificationPanel from "@/src/components/NotificationPanel";
 
 export default function ParentDashboardScreen() {
     const { user, signOut, hasSeenOnboarding, setOnboardingComplete } = useAuth();
-    const { students, buses, refreshData, getStudentAttendance, isLoading: dbLoading } = useDatabase();
+    const { students, buses, refreshData, getStudentAttendance, notifications, isLoading: dbLoading } = useDatabase();
+    const [showSearch, setShowSearch] = useState(false);
+    const [showNotif, setShowNotif] = useState(false);
+
+    const unreadCount = useMemo(() => notifications.filter(n => n.status === "unread").length, [notifications]);
     
     const [childrenIds, setChildrenIds] = useState<string[]>([]);
     const [childrenAttendance, setChildrenAttendance] = useState<{ [studentId: string]: string }>({});
@@ -116,9 +122,22 @@ export default function ParentDashboardScreen() {
                         <Text style={styles.greeting}>PARENT PORTAL</Text>
                         <Text style={styles.userName}>{user?.name ?? "Parent"}</Text>
                     </View>
-                    <TouchableOpacity style={styles.logoutBtn} onPress={signOut}>
-                        <Ionicons name="log-out-outline" size={20} color="#FF1744" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <TouchableOpacity onPress={() => setShowSearch(true)} style={styles.headerBtn} activeOpacity={0.8}>
+                            <Ionicons name="search-outline" size={20} color="#FFF" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setShowNotif(true)} style={styles.headerBtn} activeOpacity={0.8}>
+                            <Ionicons name="notifications-outline" size={20} color="#FFF" />
+                            {unreadCount > 0 && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>{unreadCount}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.logoutBtn} onPress={signOut} activeOpacity={0.8}>
+                            <Ionicons name="log-out-outline" size={20} color="#FF1744" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {loading || dbLoading ? (
@@ -240,6 +259,10 @@ export default function ParentDashboardScreen() {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
+            {/* Global Search and Notifications Overlays */}
+            <GlobalSearch visible={showSearch} onClose={() => setShowSearch(false)} />
+            <NotificationPanel visible={showNotif} onClose={() => setShowNotif(false)} />
+
             {/* First-login onboarding tutorial */}
             <OnboardingOverlay
                 role="parent"
@@ -257,6 +280,32 @@ const styles = StyleSheet.create({
     greeting: { fontSize: 10, fontWeight: "800", color: "#FFB800", letterSpacing: 2, marginBottom: 4 },
     userName: { fontSize: 24, fontWeight: "900", color: "#FFFFFF" },
     logoutBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,23,68,0.1)", alignItems: "center", justifyContent: "center" },
+    headerBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: "rgba(255,255,255,0.05)",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+    },
+    badge: {
+        position: "absolute",
+        top: -4,
+        right: -4,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: "#FF1744",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 4,
+    },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: "900",
+        color: "#FFF",
+    },
     
     sectionTitle: { fontSize: 10, fontWeight: "800", color: "#555", letterSpacing: 2, marginBottom: 12 },
 
