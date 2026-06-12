@@ -8,14 +8,17 @@ import {
 import { useAuth } from "@/src/context/AuthContext";
 import { supabase } from "@/src/lib/supabase";
 import { LinearGradient } from "expo-linear-gradient";
+import OnboardingOverlay from "@/src/components/OnboardingOverlay";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function AdminLayout() {
-    const { user, signOut } = useAuth();
+    const { user, signOut, setOnboardingComplete } = useAuth();
     const router = useRouter();
     const segments = useSegments();
 
     const [isOpen, setIsOpen] = useState(false);
     const [schoolName, setSchoolName] = useState("Fleet Manager Space");
+    const [showTutorial, setShowTutorial] = useState(false);
 
     // Dynamic school name lookup
     useEffect(() => {
@@ -209,6 +212,20 @@ export default function AdminLayout() {
                 </ScrollView>
 
                 <View style={styles.sidebarFooter}>
+                    <TouchableOpacity
+                        style={styles.replayBtn}
+                        onPress={async () => {
+                            closeSidebar();
+                            if (user?.id) {
+                                await AsyncStorage.removeItem(`onboarding_seen_${user.id}`);
+                            }
+                            setShowTutorial(true);
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="school-outline" size={18} color="#7C3AED" />
+                        <Text style={styles.replayText}>REPLAY TUTORIAL</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={styles.logoutBtn} onPress={signOut} activeOpacity={0.8}>
                         <Ionicons name="log-out-outline" size={20} color="#FF1744" />
                         <Text style={styles.logoutText}>SIGN OUT</Text>
@@ -242,6 +259,16 @@ export default function AdminLayout() {
                     />
                 </LinearGradient>
             </Animated.View>
+
+            {/* Replay onboarding tutorial */}
+            <OnboardingOverlay
+                role="admin"
+                visible={showTutorial}
+                onComplete={async () => {
+                    await setOnboardingComplete();
+                    setShowTutorial(false);
+                }}
+            />
         </View>
     );
 }
@@ -333,6 +360,19 @@ const styles = StyleSheet.create({
     },
     logoutText: { fontSize: 12, fontWeight: "900", color: "#FF1744", letterSpacing: 1 },
     versionTag: { textAlign: "center", fontSize: 10, color: "#222", marginTop: 12, fontWeight: "600" },
+    replayBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        backgroundColor: "rgba(124,58,237,0.08)",
+        borderRadius: 12,
+        height: 46,
+        borderWidth: 1,
+        borderColor: "rgba(124,58,237,0.15)",
+        marginBottom: 10,
+    },
+    replayText: { fontSize: 12, fontWeight: "900", color: "#7C3AED", letterSpacing: 1 },
 
     floatingSymbol: {
         position: "absolute",

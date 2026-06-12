@@ -9,9 +9,10 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { supabase, isSupabaseConfigured } from "@/src/lib/supabase";
 import { getFeeStatus, FEE_COLORS, formatDueDate } from "@/src/data/mockData";
+import OnboardingOverlay from "@/src/components/OnboardingOverlay";
 
 export default function ParentDashboardScreen() {
-    const { user, signOut } = useAuth();
+    const { user, signOut, hasSeenOnboarding, setOnboardingComplete } = useAuth();
     const { students, buses, refreshData, getStudentAttendance, isLoading: dbLoading } = useDatabase();
     
     const [childrenIds, setChildrenIds] = useState<string[]>([]);
@@ -238,6 +239,13 @@ export default function ParentDashboardScreen() {
                 )}
                 <View style={{ height: 100 }} />
             </ScrollView>
+
+            {/* First-login onboarding tutorial */}
+            <OnboardingOverlay
+                role="parent"
+                visible={!hasSeenOnboarding}
+                onComplete={setOnboardingComplete}
+            />
         </View>
     );
 }

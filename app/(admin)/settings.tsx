@@ -9,6 +9,8 @@ import { useAuth } from "@/src/context/AuthContext";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { router } from "expo-router";
 import { blurActiveElement, runAfterBlur, webNonFocusableProps } from "@/src/utils/webFocus";
+import OnboardingOverlay from "@/src/components/OnboardingOverlay";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function SettingRow({
     icon,
@@ -45,9 +47,10 @@ function SettingRow({
 }
 
 export default function SettingsScreen() {
-    const { user, signOut, updateProfile } = useAuth();
+    const { user, signOut, updateProfile, setOnboardingComplete } = useAuth();
     const { buses, routes, students, updateRoute, commonPassword, updateCommonPassword } = useDatabase();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showTutorial, setShowTutorial] = useState(false);
 
     // Edit Profile States
     const [isProfileExpanded, setIsProfileExpanded] = useState(false);
@@ -622,6 +625,18 @@ export default function SettingsScreen() {
                 <Text style={styles.sectionTitle}>ACCOUNT</Text>
                 <View style={styles.section}>
                     <SettingRow
+                        icon="school-outline"
+                        title="Replay App Tutorial"
+                        subtitle="Re-watch the feature walkthrough"
+                        onPress={async () => {
+                            if (user?.id) {
+                                await AsyncStorage.removeItem(`onboarding_seen_${user.id}`);
+                            }
+                            setShowTutorial(true);
+                        }}
+                        accent="#7C3AED"
+                    />
+                    <SettingRow
                         icon="information-circle-outline"
                         title="App Version"
                         subtitle="Bus Management System v1.0"
@@ -643,6 +658,16 @@ export default function SettingsScreen() {
 
                 <View style={{ height: 80 }} />
             </ScrollView>
+
+            {/* Replay onboarding tutorial */}
+            <OnboardingOverlay
+                role="admin"
+                visible={showTutorial}
+                onComplete={async () => {
+                    await setOnboardingComplete();
+                    setShowTutorial(false);
+                }}
+            />
         </View>
     );
 }

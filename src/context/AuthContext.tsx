@@ -4,11 +4,13 @@ import React, {
     useEffect,
     useContext,
     useRef,
+    useCallback,
     ReactNode,
 } from "react";
 import { supabase, AppRole } from "@/src/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { MOCK_TENANT_ID } from "@/src/data/mockData";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 
 export type UserType = {
@@ -28,6 +30,8 @@ type AuthContextType = {
     updatePassword: (newPassword: string) => Promise<void>;
     signOut: () => Promise<void>;
     isLoading: boolean;
+    hasSeenOnboarding: boolean;
+    setOnboardingComplete: () => Promise<void>;
     signInMockUser?: (role: AppRole, phoneOrEmail: string, name?: string, needsPasswordChange?: boolean) => void;
 };
 
@@ -70,7 +74,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<UserType | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [hasSeenOnboarding, setHasSeenOnboarding] = useState(true); // default true to avoid flash
     const skipNextAuthEvent = useRef(false);
+
+    // Check onboarding status whenever the user changes
+    useEffect(() => {
+        if (!user?.id) {
+            setHasSeenOnboarding(true);
+            return;
+        }
+        const checkOnboarding = async () => {
+            try {
+                const key = `onboarding_seen_${user.id}`;
+                const value = await AsyncStorage.getItem(key);
+                setHasSeenOnboarding(value === "true");
+            } catch {
+                setHasSeenOnboarding(false);
+            }
+        };
+        checkOnboarding();
+    }, [user?.id]);
+
+    const setOnboardingComplete = useCallback(async () => {
+        if (!user?.id) return;
+        try {
+            await AsyncStorage.setItem(`onboarding_seen_${user.id}`, "true");
+            setHasSeenOnboarding(true);
+        } catch (err) {
+            console.log("Error saving onboarding state:", err);
+            setHasSeenOnboarding(true);
+        }
+    }, [user?.id]);
 
     useEffect(() => {
         supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -197,7 +231,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, updateProfile, updatePassword, signOut, isLoading, signInMockUser }}>
+        <AuthContext.Provider value={{ user, session, updateProfile, updatePassword, signOut, isLoading, hasSeenOnboarding, setOnboardingComplete, signInMockUser }}>
             {children}
         </AuthContext.Provider>
     );

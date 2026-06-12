@@ -5,9 +5,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/context/AuthContext";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { router } from "expo-router";
+import OnboardingOverlay from "@/src/components/OnboardingOverlay";
 
 export default function DriverDashboard() {
-    const { user, signOut } = useAuth();
+    const { user, signOut, hasSeenOnboarding, setOnboardingComplete } = useAuth();
     const { buses, routes, students, drivers } = useDatabase();
 
     // Resolve driver's bus via user_id (reliable) then fallback to name match
@@ -90,6 +91,13 @@ export default function DriverDashboard() {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
+
+            {/* First-login onboarding tutorial */}
+            <OnboardingOverlay
+                role="driver"
+                visible={!hasSeenOnboarding}
+                onComplete={setOnboardingComplete}
+            />
         </View>
     );
 }

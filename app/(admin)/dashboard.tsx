@@ -21,6 +21,7 @@ import { getFeeStatus, FEE_COLORS } from "@/src/data/mockData";
 import { useDatabase } from "@/src/context/DatabaseContext";
 import { blurActiveElement, runAfterBlur, webNonFocusableProps } from "@/src/utils/webFocus";
 import { LineChart, PieChart } from "react-native-chart-kit";
+import OnboardingOverlay from "@/src/components/OnboardingOverlay";
 
 const { width } = Dimensions.get("window");
 const CARD_W = (width - 20 * 2 - 12) / 2;
@@ -128,7 +129,7 @@ function ActionGridItem({
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
-    const { user, signOut } = useAuth();
+    const { user, signOut, hasSeenOnboarding, setOnboardingComplete } = useAuth();
     const { buses, routes, students, refreshData, fetchRevenueStats } = useDatabase();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [revenueData, setRevenueData] = useState<{ month: string; revenue: number }[]>([]);
@@ -438,6 +439,13 @@ export default function AdminDashboard() {
 
                 </Animated.View>
             </ScrollView>
+
+            {/* First-login onboarding tutorial */}
+            <OnboardingOverlay
+                role="admin"
+                visible={!hasSeenOnboarding}
+                onComplete={setOnboardingComplete}
+            />
         </View>
     );
 }
