@@ -278,7 +278,7 @@ export default function LoginScreen() {
                                         <>
                                             <Ionicons name="bus" size={18} color="#0A0A0F" />
                                             <Text style={styles.loginBtnText}>
-                                                LET'S RIDE
+                                                {"LET'S RIDE"}
                                             </Text>
                                             <Ionicons
                                                 name="arrow-forward"

@@ -107,7 +107,7 @@ export default function ForgotPasswordScreen() {
                                 <Ionicons name="checkmark-circle" size={48} color="#00E676" />
                                 <Text style={styles.successTitle}>Reset Email Sent!</Text>
                                 <Text style={styles.successSub}>
-                                    We've sent a password reset link to{"\n"}
+                                    We&apos;ve sent a password reset link to{"\n"}
                                     <Text style={{ fontWeight: "800", color: "#FFB800" }}>{email}</Text>
                                     {"\n\n"}Check your inbox and follow the link to set a new password.
                                 </Text>
@@ -118,7 +118,7 @@ export default function ForgotPasswordScreen() {
                         ) : (
                             <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
                                 <Text style={styles.cardDescription}>
-                                    Enter your registered email address and we'll send you a link to reset your password.
+                                    Enter your registered email address and we&apos;ll send you a link to reset your password.
                                 </Text>
 
                                 {/* Email Input */}

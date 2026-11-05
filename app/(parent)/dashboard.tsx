@@ -148,7 +148,7 @@ export default function ParentDashboardScreen() {
                     <View style={styles.emptyWrap}>
                         <Ionicons name="people-outline" size={64} color="#222" />
                         <Text style={styles.emptyTitle}>No children registered</Text>
-                        <Text style={styles.emptySub}>Ask the school administrator to link your account to your children's profiles.</Text>
+                        <Text style={styles.emptySub}>Ask the school administrator to link your account to your children&apos;s profiles.</Text>
                     </View>
                 ) : (
                     <>
@@ -188,7 +188,7 @@ export default function ParentDashboardScreen() {
 
                                     {/* Daily Attendance Card */}
                                     <View style={styles.infoSection}>
-                                        <Text style={styles.infoSectionTitle}>TODAY'S ATTENDANCE</Text>
+                                        <Text style={styles.infoSectionTitle}>{"TODAY'S ATTENDANCE"}</Text>
                                         <View style={[styles.attendanceBanner, { backgroundColor: attConfig.bg }]}>
                                             <Ionicons name={attConfig.icon} size={18} color={attConfig.color} />
                                             <Text style={[styles.attendanceLabel, { color: attConfig.color }]}>
